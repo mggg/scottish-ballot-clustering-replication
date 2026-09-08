@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+*.pyc
+.ruff_cache/
+results/
+slurm-*.out
+*.egg-info/
+build/
+dist/
+/dev-files
