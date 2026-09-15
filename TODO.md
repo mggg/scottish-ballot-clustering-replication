@@ -1,7 +1,5 @@
 # TODO
 
-- [ ] Synchronize the Scottish election data and solution names.
+- [ ] Incorporate the tabluation notebook into the central structure of the project
 
-- [ ] Measure runtime with PAM warm starts.
-
-- [ ] Measure runtime with verified optimal-solution warm starts.
+- [ ] Add plotting scripts
