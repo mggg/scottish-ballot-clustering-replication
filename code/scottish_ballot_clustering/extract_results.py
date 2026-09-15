@@ -285,11 +285,11 @@ def _coordinate_centers(
     Raises:
         ValueError: If indicator dimensions, allowed values, or coordinate selections are invalid.
     """
-    if not indicators or any(i < 0 or not 0 <= r < n_clusters for i, r, v in indicators):
+    if not indicators or any(i < 0 or not 0 <= r < n_clusters for i, r, _ in indicators):
         raise ValueError("Missing or invalid coordinate center indicators")
 
-    dimension = max(i for i, r, v in indicators) + 1
-    values = {v for i, r, v in indicators}
+    dimension = max(i for i, _, _ in indicators) + 1
+    values = {v for _, _, v in indicators}
     allowed = {-1, 0, 1} if model.endswith("head_to_head") else set(range(dimension))
 
     if not values <= allowed:

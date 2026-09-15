@@ -435,11 +435,11 @@ def _validate_dimensions(
     if x.keys() != {(j, r) for j in range(len(coordinates)) for r in range(n_clusters)}:
         raise ValueError("Warm-start ballot or cluster count does not match the model")
 
-    if not np.isin(coordinates, list({v for i, r, v in z})).all():
+    if not np.isin(coordinates, list({v for _, _, v in z})).all():
         raise ValueError("Warm-start coordinates are outside the model's allowed values")
 
     expected = {(i, r) for i in range(coordinates.shape[1]) for r in range(n_clusters)}
-    if {(i, r) for i, r, v in z} != expected:
+    if {(i, r) for i, r, _ in z} != expected:
         raise ValueError("Warm-start coordinate dimensions do not match the model")
 
 

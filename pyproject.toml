@@ -29,6 +29,12 @@ pythonpath = ["code"]
 [tool.pyright]
 include = ["code"]
 extraPaths = ["code"]
+typeCheckingMode = "standard"
+
+reportUnusedVariable = "warning"
+reportUnusedImport = "warning"
+reportUnusedFunction = "warning"
+reportUnusedClass = "warning"
 
 [build-system]
 requires = ["setuptools>=61"]
