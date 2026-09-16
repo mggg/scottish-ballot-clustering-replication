@@ -8,3 +8,4 @@ slurm-*.out
 build/
 dist/
 /dev-files
+IP_solutions
