@@ -159,6 +159,7 @@ underlying platform behavior.
 | `code/hpc/`                                                             | Job manifests, the batch model runner, and SLURM scripts.                |
 | `code/tests/`                                                           | Model and workflow checks.                                               |
 | [data/scot-elex/](data/scot-elex/README.md)                             | Election CSVs, provenance, and format.                                   |
+| [viz/](viz/README.md)                                                   | Animated STV counts in the browser, and how to run them.                 |
 | [data/optimal_cluster_centers/](data/optimal_cluster_centers/README.md) | Published solution ZIPs.                                                 |
 | [reports/](reports/README.md)                                           | Warm-start measurements and comparisons.                                 |
 

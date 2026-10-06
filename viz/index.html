@@ -1,0 +1,323 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Scottish STV counts</title>
+<!-- Needs a local web server; see viz/README.md for the commands. -->
+<style>
+  html, body { height: 100%; margin: 0; }
+  body { font: 14px sans-serif; background: #fff; color: #000; box-sizing: border-box; padding: 20px 20px 0; display: grid; grid-template: auto 1fr / 300px 1fr; gap: 0 24px; overflow: hidden; }
+  h1 { grid-column: 1 / -1; margin: 0 0 12px; }
+  nav, main { overflow: auto; min-height: 0; padding-bottom: 20px; }   /* each pane scrolls; the page doesn't */
+  nav { border-right: 1px solid #ddd; padding-right: 16px; }
+  nav details details { margin-left: 16px; }
+  nav ul { margin: 4px 0 8px; padding-left: 20px; }
+  nav small, .name small, #sub { color: #666; }
+  nav a[aria-current] { font-weight: bold; }
+  nav li small { white-space: nowrap; }
+  #stage { display: flow-root; padding: 4px 24px 12px; }   /* flow-root keeps the chart's margins inside the video */
+  #steps { list-style: none; padding: 0; }   /* numbers are in the text so the video copies them */
+  #steps li { color: #aaa; margin: 3px 0; }
+  #steps li.done { color: #000; }
+  #steps li.now { color: #000; font-weight: bold; }
+  #rec-msg { color: #b00; }
+  #chart { position: relative; margin: 40px 100px 20px 260px; font-size: 16px; }
+  .row { position: relative; height: 36px; margin: 12px 0; }
+  .name { position: absolute; right: 100%; margin-right: 8px; max-width: 250px; overflow: hidden; text-overflow: ellipsis; line-height: 36px; white-space: nowrap; }
+  .out .name { text-decoration: line-through; color: #888; }
+  .seg, .chip { position: absolute; top: 0; height: 36px; background: var(--c); }
+  .elected .seg { background: #2a2; }
+  .out .seg { background: #ccc; }
+  .chip { transition: left var(--fly), top var(--fly); }
+  .total { position: absolute; margin-left: 6px; line-height: 36px; font-weight: bold; }
+  #quota { position: absolute; top: -20px; bottom: 0; border-left: 2px dashed red; }
+  #quota i { position: absolute; left: 4px; color: red; white-space: nowrap; }
+</style>
+
+<h1>Scottish STV counts</h1>
+<nav id="index">Loading…</nav>
+<main id="view" hidden>
+  <button id="replay">Replay</button>
+  <label>Speed <select id="speed"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option></select></label>
+  <button id="rec">Record video</button> <span id="rec-msg"></span>
+  <div id="stage">
+    <h2 id="heading"></h2>
+    <div id="sub"></div>
+    <div id="chart"><div id="quota"><i></i></div><div id="rows"></div></div>
+    <ol id="steps"></ol>
+  </div>
+</main>
+
+<template id="group"><details><summary></summary></details></template>
+<template id="ward"><li><a></a> <small></small></li></template>
+<template id="row">
+  <div class="row"><span class="name"><span></span> <small></small></span><div class="track"></div><span class="total"></span></div>
+</template>
+
+<script>
+const ROOT = '../';   // paths in elections.csv are relative to the repo root
+const EPS = 1e-6;
+const COLORS = ['#e6194b', '#4363d8', '#f58231', '#911eb4', '#42d4f4', '#f032e6', '#9a6324',   // no greens:
+  '#800000', '#000075', '#ffe119', '#469990', '#fabed4', '#dcbeff', '#ffd8b1'];               // green = elected
+const $ = id => document.getElementById(id);
+const tpl = id => $(id).content.firstElementChild.cloneNode(true);
+const speed = () => +$('speed').value;
+const sleep = ms => new Promise(r => setTimeout(r, ms / speed()));   // animation time, scaled by the speed menu
+const fmt = n => +n.toFixed(2);
+const get = url => fetch(url).then(r => { if (!r.ok) throw Error(`${url}: HTTP ${r.status}`); return r.text(); });
+const lines = text => text.trim().split(/\r?\n/);
+// one CSV line -> fields, honouring "quoted, fields" and "" escapes
+const cells = line => [...line.matchAll(/(?:^|,)("(?:[^"]|"")*"|[^,]*)/g)].map(m => m[1].replace(/^"(.*)"$/s, '$1').replaceAll('""', '"'));
+
+// Rebuild the count from a vote table (votes[round][candidate]). Every table in the repo moves one
+// candidate's votes per round: a surplus cut back to quota, or an elimination cut to zero. The gains
+// are the transfers; whatever they don't cover is non-transferable. Droop quota, as Scotland uses.
+function count(names, votes, seats) {
+  const total = votes[0].reduce((a, b) => a + b, 0);
+  const quota = Math.floor(total / (seats + 1)) + 1;
+  const status = names.map(() => 'hopeful');
+  const ids = s => status.flatMap((x, i) => x == s ? [i] : []);
+  const list = is => is.map(i => names[i]).join(' and ');
+  const stages = votes.map((v, r) => {
+    let note = `First preferences: ${fmt(total)} votes for ${seats} seats, quota ${quota}.`, from, transfers = {}, lost = 0;
+    if (r) {
+      const d = v.map((x, i) => x - votes[r - 1][i]);
+      from = d.findIndex(x => x < -EPS);
+      if (from < 0) throw Error(`round ${r + 1}: no candidate lost votes`);
+      d.forEach((x, i) => { if (x > EPS) transfers[i] = x; });
+      lost = -d[from] - Object.values(transfers).reduce((a, b) => a + b, 0);
+      if (status[from] == 'elected') note = `${names[from]}'s surplus of ${fmt(-d[from])} transferred.`;
+      else { status[from] = 'out'; note = `${names[from]} eliminated, ${fmt(-d[from])} votes transferred.`; }
+      if (lost > 0.005) note += ` ${fmt(lost)} non-transferable.`;
+    }
+    const now = ids('hopeful').filter(i => v[i] >= quota - EPS);
+    now.forEach(i => status[i] = 'elected');
+    if (now.length) note += ` ${list(now)} elected.`;
+    return { votes: v, status: [...status], note, from, transfers, lost };
+  });
+  const left = seats - ids('elected').length, last = votes.at(-1);
+  if (left > 0) {   // the remaining candidates fill the last seats without reaching quota
+    const fill = ids('hopeful').sort((a, b) => last[b] - last[a]).slice(0, left);
+    fill.forEach(i => status[i] = 'elected');
+    stages.push({ votes: last, status: [...status], note: `${list(fill)} elected without reaching quota.` });
+  }
+  if (stages.length > 1) stages.at(-1).note += ` Elected: ${ids('elected').map(i => names[i]).join(', ')}.`;
+  return { quota, stages };
+}
+
+// self-checks: A's surplus of 1 goes to B, C is eliminated and B takes the second seat
+{
+  const { quota, stages } = count(['A', 'B', 'C'], [[5, 2, 2], [4, 3, 2], [4, 5, 0]], 2);
+  console.assert(quota == 4 && stages[1].from == 0 && stages[1].transfers[1] == 1 && stages[2].transfers[1] == 2
+    && stages.at(-1).status.join() == 'elected,elected,out', 'count self-check failed', stages);
+  console.assert(cells('a,"b, ""c""",').join('|') == 'a|b, "c"|', 'csv self-check failed');
+}
+
+const elections = new Map();
+let run = 0, current;
+
+async function show({ e, names, parties, votes }) {
+  const me = ++run;
+  const { quota, stages } = count(names, votes, e.seats);
+  const max = Math.max(quota, ...votes.flat()) * 1.1;
+  const pct = v => v / max * 100 + '%';
+  const color = i => COLORS[i % COLORS.length];
+  // each bar is a stack of chunks coloured by who sent them, until the holder is elected or out
+  const segs = names.map((_, i) => [{ from: i, amt: votes[0][i] }]);
+  const rows = names.map((name, i) => {
+    const row = tpl('row');
+    row.querySelector('.name span').textContent = name;
+    row.querySelector('.name small').textContent = parties[i];
+    row.querySelector('.name').title = `${name} (${parties[i]})`;
+    return row;
+  });
+  $('heading').textContent = `${e.council} ${e.year}: ${e.ward}`;
+  $('sub').textContent = `${e.seats} seats, ${names.length} candidates, quota ${quota}`;
+  $('quota').style.left = pct(quota);
+  $('quota').firstChild.textContent = `quota ${quota}`;
+  $('rows').replaceChildren(...rows);
+  $('chart').querySelectorAll('.chip').forEach(c => c.remove());   // left over from an interrupted run
+  const steps = stages.map((s, i) => Object.assign(document.createElement('li'), { textContent: `${i + 1}. ${s.note}` }));
+  $('steps').replaceChildren(...steps);
+  $('view').hidden = false;
+
+  const paint = (i, st) => {
+    let x = 0;
+    rows[i].className = 'row ' + st;
+    rows[i].querySelector('.track').replaceChildren(...segs[i].map(g => {
+      const d = document.createElement('div');
+      d.className = 'seg';
+      d.style.cssText = `left:${pct(x)};width:${pct(g.amt)};--c:${color(g.from)}`;
+      x += g.amt;
+      return d;
+    }));
+    const total = rows[i].querySelector('.total');
+    total.style.left = pct(x);
+    total.textContent = fmt(x);
+  };
+  const draw = s => {
+    names.forEach((_, i) => paint(i, s.status[i]));
+  };
+  // cut the transferred votes off the source bar and fly one chip per recipient to the end of their
+  // bar; non-transferable votes are cut off with no chip
+  const fly = async (prev, s) => {
+    const keep = s.votes[s.from];   // quota after a surplus, 0 after an elimination
+    let x = keep;
+    const chips = Object.entries(s.transfers).map(([to, amt]) => {
+      const chip = document.createElement('div');
+      chip.className = 'chip';
+      chip.style.cssText = `left:${pct(x)};width:${pct(amt)};top:${rows[s.from].offsetTop}px;--c:${color(s.from)};--fly:${1 / speed()}s`;
+      x += amt;
+      $('chart').append(chip);
+      return [chip, +to, amt];
+    });
+    let left = keep;
+    segs[s.from] = segs[s.from].flatMap(g => { const a = Math.min(g.amt, left); left -= a; return a > EPS ? [{ ...g, amt: a }] : []; });
+    paint(s.from, s.status[s.from]);
+    $('chart').offsetWidth;   // force layout so the moves below animate
+    for (const [chip, to] of chips) { chip.style.left = pct(prev[to]); chip.style.top = rows[to].offsetTop + 'px'; }
+    await sleep(1000);
+    for (const [chip, to, amt] of chips) { chip.remove(); segs[to].push({ from: s.from, amt }); paint(to, s.status[to]); }
+  };
+
+  for (let i = 0; i < stages.length; i++) {
+    if (me != run) return;
+    steps.forEach((li, j) => li.className = j < i ? 'done' : j == i ? 'now' : '');
+    if (stages[i].from != null) await fly(stages[i - 1].votes, stages[i]);
+    if (me != run) return;
+    draw(stages[i]);
+    await sleep(1500);
+  }
+}
+
+async function open(e) {
+  const [table, ballots] = await Promise.all([get(ROOT + e.table), get(ROOT + e.election)]);
+  if (location.hash.slice(1) != e.id) return;   // another election was picked meanwhile
+  const rows = lines(table).slice(1).map(cells);   // header is Candidate, Round 1, Round 2, ...
+  // names from the vote table (the election files truncate some); parties from the election file, same order
+  const parties = lines(ballots).filter(l => l.startsWith('"Candidate ')).map(l => cells(l)[2].match(/\(([^()]*)\)\s*$/)?.[1] ?? '');
+  const votes = rows[0].slice(1).map((_, r) => rows.map(row => +row[r + 1]));
+  current = { e, names: rows.map(r => r[0]), parties, votes };
+  await show(current);
+}
+
+function route() {
+  const e = elections.get(location.hash.slice(1));
+  if (!e) return;
+  document.querySelector('nav [aria-current]')?.removeAttribute('aria-current');
+  e.link.setAttribute('aria-current', 'page');
+  for (let d = e.link.closest('details'); d; d = d.parentElement.closest('details')) d.open = true;
+  e.link.scrollIntoView({ block: 'nearest' });
+  open(e).catch(err => { $('view').hidden = false; $('heading').textContent = `Could not load ${e.id}: ${err.message}`; });
+}
+addEventListener('hashchange', route);
+
+get('elections.csv').then(text => {
+  const [head, ...body] = lines(text).map(cells);
+  const group = (parent, label) => { const d = tpl('group'); d.firstElementChild.textContent = label; parent.append(d); return d; };
+  $('index').replaceChildren();
+  const all = body.map(r => Object.fromEntries(head.map((h, i) => [h, r[i]])));
+  for (const [year, inYear] of Map.groupBy(all, e => e.year)) {
+    const y = group($('index'), `${year} (${inYear.length})`);
+    for (const [council, list] of Map.groupBy(inYear, e => e.council)) {
+      const ul = group(y, `${council} (${list.length})`).appendChild(document.createElement('ul'));
+      for (const e of list) {
+        const li = tpl('ward');
+        e.seats = +e.seats;
+        e.link = li.querySelector('a');
+        e.link.href = '#' + e.id;
+        e.link.textContent = e.ward;
+        li.querySelector('small').textContent = `${e.seats} seats, ${e.candidates} cands`;
+        ul.append(li);
+        elections.set(e.id, e);
+      }
+    }
+  }
+  route();
+}).catch(err => {
+  $('index').textContent = `Could not load the election list (${err.message}). This page needs a local web server: in the repo root run "python3 -m http.server 8000", then open http://localhost:8000/viz/ (other options in viz/README.md).`;
+});
+
+// Record the current count without screen capture: replay it while copying the stage onto a canvas
+// every frame, and encode the canvas. The video keeps one size, so the encoder never restarts.
+// MP4 where MediaRecorder supports it (Safari, recent Chrome), else WebM.
+async function record() {
+  const stage = $('stage');
+  $('rec-msg').textContent = '';
+  $('rec').disabled = $('replay').disabled = true;   // replaying would cut the recording short
+  try {
+    const playing = show(current);   // builds the stage right away, then animates
+    const steps = [...$('steps').children], was = steps.map(li => li.className);
+    steps.forEach(li => li.className = 'now');   // measure the tallest layout: every step bold
+    const box = stage.getBoundingClientRect();
+    steps.forEach((li, i) => li.className = was[i]);
+    const k = Math.min(devicePixelRatio || 1, 2), even = n => Math.ceil(n * k / 2) * 2;   // H.264 wants even sizes
+    const canvas = Object.assign(document.createElement('canvas'), { width: even(box.width), height: even(box.height) });
+    const g = canvas.getContext('2d');
+    const mimeType = ['video/mp4;codecs=avc1', 'video/mp4', 'video/webm'].find(t => MediaRecorder.isTypeSupported(t));
+    const rec = new MediaRecorder(canvas.captureStream(30), { mimeType, videoBitsPerSecond: 8e6 });   // bitrate: raise if text looks soft
+    const parts = [];
+    rec.ondataavailable = e => parts.push(e.data);
+    const stopped = new Promise(r => rec.onstop = r);
+    let on = true;
+    const tick = () => { if (on) { drawStage(g, k, stage); requestAnimationFrame(tick); } };
+    tick();
+    rec.start();
+    await playing;
+    on = false;
+    rec.stop();
+    await stopped;
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob(parts, { type: rec.mimeType }));
+    a.download = current.e.id + (rec.mimeType.includes('mp4') ? '.mp4' : '.webm');
+    a.click();
+  } catch (err) {
+    $('rec-msg').textContent = `Recording failed: ${err.message}`;
+  } finally {
+    $('rec').disabled = $('replay').disabled = false;
+  }
+}
+$('rec').onclick = record;
+$('replay').onclick = () => show(current);
+$('rec').hidden = !(window.MediaRecorder && HTMLCanvasElement.prototype.captureStream);
+
+// Paint the stage onto a canvas from the page's live layout: coloured boxes, the dashed quota line,
+// and text word by word where the browser placed it. Covers what this page draws, nothing more.
+function drawStage(g, k, stage) {
+  const o = stage.getBoundingClientRect();
+  // boxes snap to whole canvas pixels, so touching chunks show no light seams between them
+  const X = v => Math.round((v - o.left) * k), Y = v => Math.round((v - o.top) * k);
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  g.fillStyle = '#fff';
+  g.fillRect(0, 0, g.canvas.width, g.canvas.height);
+  for (const el of stage.querySelectorAll('.seg, .chip')) {   // chips report their mid-flight position
+    const r = el.getBoundingClientRect();
+    g.fillStyle = getComputedStyle(el).backgroundColor;
+    g.fillRect(X(r.left), Y(r.top), X(r.right) - X(r.left), Y(r.bottom) - Y(r.top));
+  }
+  g.setTransform(k, 0, 0, k, -o.left * k, -o.top * k);   // lines and text in page coordinates
+  const q = $('quota').getBoundingClientRect();
+  g.strokeStyle = 'red';
+  g.lineWidth = 2;
+  g.setLineDash([6, 4]);
+  g.beginPath(); g.moveTo(q.left + 1, q.top); g.lineTo(q.left + 1, q.bottom); g.stroke();
+  g.setLineDash([]);
+  g.lineWidth = 1;
+  const range = document.createRange(), walk = document.createTreeWalker(stage, NodeFilter.SHOW_TEXT);
+  for (let t; (t = walk.nextNode());) {
+    const cs = getComputedStyle(t.parentElement);
+    g.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+    g.fillStyle = g.strokeStyle = cs.color;
+    const descent = g.measureText(t.data).fontBoundingBoxDescent;
+    for (const m of t.data.matchAll(/\S+/g)) {
+      range.setStart(t, m.index);
+      range.setEnd(t, m.index + m[0].length);
+      const r = range.getBoundingClientRect();
+      g.fillText(m[0], r.left, r.bottom - descent);
+    }
+    if (t.parentElement.closest('.out .name')) {   // eliminated candidates are struck through
+      range.selectNodeContents(t);
+      const r = range.getBoundingClientRect(), y = r.top + r.height * 0.55;
+      g.beginPath(); g.moveTo(r.left, y); g.lineTo(r.right, y); g.stroke();
+    }
+  }
+}
+</script>
