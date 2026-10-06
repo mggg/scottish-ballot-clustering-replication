@@ -1,0 +1,10 @@
+# Publish only the viz and the two data folders it reads, laid out as in the repo
+[build]
+  command = "rm -rf site && mkdir -p site/data && cp -R viz site/ && cp -R data/scottish_vote_tables data/scot-elex site/data/"
+  publish = "site"
+
+# Send the bare site URL to the viz
+[[redirects]]
+  from = "/"
+  to = "/viz/"
+  status = 302
