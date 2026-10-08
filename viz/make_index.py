@@ -1,5 +1,7 @@
-"""Write viz/elections.csv, the index the STV viz loads: one row per vote table, with the
-matching election file, seats, and ward name. Standard library only. Rerun when the data changes:
+"""Write viz/elections.csv, the index the STV viz loads: one row per election, with the election
+file the page counts from, seats, ward name, and full candidate names. The names come from the vote
+table, because the election files cut some short at hyphens and accents; the vote table's path is
+kept for viz/check.mjs. Standard library only. Rerun when the data changes:
 
     python3 viz/make_index.py
 """
@@ -35,6 +37,10 @@ for table in DATA.glob("scottish_vote_tables/*_cands/*_votes_table.csv"):
     lines = election.read_text(encoding="utf-8").strip().splitlines()
     ward = lines[-1].strip(' \t",')  # some files double-quote or pad the ward name
     num = re.fullmatch(r"ward(\d+)", ward_slug)
+    with open(table, encoding="utf-8", newline="") as f:
+        names = [r[0] for r in list(csv.reader(f))[1:]]
+    if len(names) != int(n) or any("|" in x for x in names):
+        raise SystemExit(f"unexpected candidate names in {table}")
     rows.append({
         "id": name.removesuffix(".csv"),
         "year": year,
@@ -42,6 +48,7 @@ for table in DATA.glob("scottish_vote_tables/*_cands/*_votes_table.csv"):
         "ward": ward,
         "seats": int(lines[0].split(",")[1]),
         "candidates": int(n),
+        "names": "|".join(names),
         "table": table.relative_to(ROOT).as_posix(),
         "election": election.relative_to(ROOT).as_posix(),
         "_sort": (-int(year), slug, int(num[1]) if num else 999, ward),

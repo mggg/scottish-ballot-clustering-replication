@@ -54,7 +54,9 @@
   .trash .dot { display: none; }
   :root { --elected: #697478; }   /* winner colour */
   .dot { display: inline-block; width: 10px; height: 10px; margin-left: 6px; border-radius: 50%; vertical-align: middle; background: var(--c); }
-  .seg, .chip { position: absolute; top: 0; height: 36px; box-sizing: border-box; background: var(--c); }
+  .seg, .chip { position: absolute; top: 0; height: 36px; box-sizing: border-box; }
+  .seg, .chip div { background: var(--c); }
+  .chip { display: flex; }   /* a stack of the voters' first choices it carries */
   .seg + .seg { border-left: 1px solid #fff; }   /* a divider between chunks */
   .elected .seg { background: var(--elected); border-left: 0; }   /* a winner keeps a share of every ballot, not whole chunks */
   /* a winner's strip: their votes split by the candidate those voters ranked first */
@@ -63,12 +65,12 @@
   .support div { background: var(--c); }
   .out .seg { background: #ccc; }
   .chip { transition: left var(--fly), top var(--fly); }
-  /* non-transferable votes: diagonal hatching in the colour of the candidate whose transfer lost them */
-  .trash .seg, .chip.lost { background: repeating-linear-gradient(45deg, var(--c) 0 3px, #fff 3px 7px); }
+  /* non-transferable votes: diagonal hatching in the colour of the voters' first choice */
+  .trash .seg, .chip.lost div { background: repeating-linear-gradient(45deg, var(--c) 0 3px, #fff 3px 7px); }
   .total { position: absolute; margin-left: 6px; line-height: 36px; font-weight: bold; }
   #quota { position: absolute; top: -20px; bottom: 0; border-left: 2px dashed var(--elected); }   /* the winners' grey: reaching it wins */
   #quota i { position: absolute; left: 4px; color: var(--elected); white-space: nowrap; }
-  /* hover (or tap) popup: a row's votes by who last passed them on */
+  /* hover (or tap) popup: a row's votes by the voters' first choice */
   #tip { position: fixed; z-index: 10; pointer-events: none; min-width: 240px; max-width: 360px; padding: 10px 12px; background: #fff; border: 1px solid #d5d9dc; border-radius: 8px; box-shadow: 0 6px 20px rgba(0, 0, 0, .12); font-size: 13px; }
   #tip .head { display: flex; align-items: baseline; gap: 6px; font-weight: bold; }
   #tip .head small { font-weight: normal; color: #666; }
@@ -114,27 +116,32 @@
       <a href="https://github.com/mggg/scottish-ballot-clustering-replication">mggg/scottish-ballot-clustering-replication</a>
       repository on GitHub. David McCune assembled and cleaned the ballot records from Scottish sources.
       They are in <a href="https://github.com/mggg/scottish-ballot-clustering-replication/tree/main/data/scot-elex"><code>data/scot-elex/</code></a>,
-      one file per election with every ballot and each candidate's party. Each vote table in
+      one file per election with every ballot's ranking and each candidate's party. The page counts each
+      election from those ballots itself. The published round-by-round results in
       <a href="https://github.com/mggg/scottish-ballot-clustering-replication/tree/main/data/scottish_vote_tables"><code>data/scottish_vote_tables/</code></a>
-      lists every candidate's total after each round of the count.</p>
+      serve as a check: the page's counts match all 1,070 of them exactly.</p>
     <h3>How a count works</h3>
     <p>A candidate wins on reaching the quota: the total votes divided by one more than the number of
-      seats, rounded down, plus one. Each round moves one candidate's votes on to the next choice on each
-      ballot: either a winner's surplus above the quota, or every vote of the candidate in last place.
-      Votes whose ballots rank no one still in the race are non-transferable. The vote tables only record
-      totals, so the page reads each transfer from whose totals rise, and counts the shortfall as
-      non-transferable.</p>
+      seats, rounded down, plus one. Each round moves one candidate's ballots on to the next choice still
+      in the race. A winner's surplus above the quota goes first, earliest winner first: every ballot the
+      winner holds moves on at a fraction of its value, rounded down to five decimal places, so that
+      together they carry just the surplus. With no surplus left to move, the candidate in last place is
+      eliminated and all their ballots move on. Ballots that rank no one still in the race, and the
+      fractions lost to rounding, are non-transferable.</p>
     <h3>What the colours mean</h3>
-    <p>Bars use party colours, lighter for each later candidate of a party in alphabetical order. Each
-      chunk of a bar shows the candidate who last passed those votes on, not who the voters first chose:
-      a vote can pass through several candidates before it settles. A winner's bar turns grey, and the
-      strip along its bottom shows the voters' first choices instead. The page works those out by
-      replaying the ballots in the order the vote table records, which reproduces every table to within
-      0.05 votes. Non-transferable votes collect in the bottom row, hatched in the colour of the
-      candidate whose transfer lost them. Hover over or tap a row for a table of who last passed its votes on.</p>
+    <p>Bars use party colours: Labour, Conservative, Liberal Democrat, Green and SNP have their own, and
+      every other party, independents included, shares the independents' teal. Candidates sharing a
+      colour get lighter shades in ballot order, which is alphabetical by surname. The page follows
+      every ballot through the count, so each chunk of a bar shows which candidate those voters ranked
+      first, even after their votes have passed through other candidates. When votes move, they fly
+      from the candidate passing them on, coloured by the same first choices. A winner's bar turns
+      grey, and the strip along its bottom shows their voters' first choices. Non-transferable votes
+      collect in the bottom row, hatched in the colour of the voters' first choice. Hover over or tap a
+      row for a table of its votes by first choice.</p>
     <h3>Controls</h3>
-    <p>Pause stops between steps, and Previous step and Next step move one step at a time. Click any
-      step in the list to jump to it. Download replays the count and saves it as a video.</p>
+    <p>Replay restarts the count. Pause stops between steps, and Previous step and Next step move one
+      step at a time; click any step in the list to jump to it. Speed and Order change how fast the count
+      plays and how candidates are sorted. Download MP4 replays the count and saves it as a video.</p>
   </section>
   <div id="view" hidden>
     <div id="controls">
@@ -151,7 +158,7 @@
       <h2 id="heading"></h2>
       <div id="sub"></div>
       <div id="chart"><div id="quota"><i></i></div><div id="rows"></div></div>
-      <p id="legend">Bar colours show who last passed the votes on, not who the voters first chose. A winner's strip shows the voters' first choices. Non-transferable votes collect, hatched, in the bottom row.</p>
+      <p id="legend">Colours show which candidate each vote's voter ranked first. A winner's bar turns grey, with their voters' first choices in the strip along its bottom. Non-transferable votes collect, hatched, in the bottom row.</p>
       <ol id="steps"></ol>
     </div>
   </div>
@@ -188,87 +195,111 @@ const lines = text => text.trim().split(/\r?\n/);
 // one CSV line -> fields, honouring "quoted, fields" and "" escapes
 const cells = line => [...line.matchAll(/(?:^|,)("(?:[^"]|"")*"|[^,]*)/g)].map(m => m[1].replace(/^"(.*)"$/s, '$1').replaceAll('""', '"'));
 
-// Rebuild the count from a vote table (votes[round][candidate]). Every table in the repo moves one
-// candidate's votes per round: a surplus cut back to quota, or an elimination cut to zero. The gains
-// are the transfers; whatever they don't cover is non-transferable. Droop quota, as Scotland uses.
-function count(names, votes, seats) {
-  const total = votes[0].reduce((a, b) => a + b, 0);
+// Count an election from its ballots under Scotland's STV rules. The quota is the votes divided by one
+// more than the seats, rounded down, plus one, and reaching it elects. Surpluses move one at a time,
+// earliest winner first, then the largest; every ballot the winner holds moves on at a transfer value
+// rounded down to five decimal places, and the winner keeps the quota. With no surplus waiting, the
+// candidate in last place is eliminated and all their ballots move on at their current value. Ties go
+// by the earliest round where the candidates differed, then ballot order. Each pile of identical
+// ballots remembers its first preference, so every stage also gives each candidate's votes by the
+// voters' first choice, and the votes lost so far by first choice too. This reproduces all 1,070 vote tables in data/scottish_vote_tables exactly;
+// `node viz/check.mjs` re-checks.
+function count(names, seats, ballots) {   // ballots: [{ n, prefs }], prefs are candidate indexes
+  const total = ballots.reduce((t, b) => t + b.n, 0);
   const quota = Math.floor(total / (seats + 1)) + 1;
-  const status = names.map(() => 'hopeful');
-  const ids = s => status.flatMap((x, i) => x == s ? [i] : []);
+  const piles = ballots.map(b => ({ n: b.n, prefs: b.prefs, i: 0, w: 1 }));   // w: each ballot's current value
+  const at = p => p.prefs[p.i];   // who holds the pile; undefined once its preferences run out
+  const status = names.map(() => 'hopeful'), reached = names.map(() => Infinity), kept = names.map(() => null);
+  const ids = st => status.flatMap((x, i) => x == st ? [i] : []);
   const list = is => is.map(i => names[i]).join(' and ');
-  const stages = votes.map((v, r) => {
-    let note = `First preferences: ${fmt(total)} votes for ${seats} seats, quota ${quota}.`, from, transfers = {}, lost = 0;
-    if (r) {
-      const d = v.map((x, i) => x - votes[r - 1][i]);
-      from = d.findIndex(x => x < -EPS);
-      if (from < 0) throw Error(`round ${r + 1}: no candidate lost votes`);
-      d.forEach((x, i) => { if (x > EPS) transfers[i] = x; });
-      lost = -d[from] - Object.values(transfers).reduce((a, b) => a + b, 0);
-      if (status[from] == 'elected') note = `${names[from]}'s surplus of ${fmt(-d[from])} transferred.`;
-      else { status[from] = 'out'; note = `${names[from]} eliminated, ${fmt(-d[from])} votes transferred.`; }
-      if (lost > 0.005) note += ` ${fmt(lost)} non-transferable.`;
-    }
-    const now = ids('hopeful').filter(i => v[i] >= quota - EPS);
-    now.forEach(i => status[i] = 'elected');
-    if (now.length) note += ` ${list(now)} elected.`;
-    return { votes: v, status: [...status], note, from, transfers, lost };
-  });
-  const left = seats - ids('elected').length, last = votes.at(-1);
-  if (left > 0) {   // the remaining candidates fill the last seats without reaching quota
-    const fill = ids('hopeful').sort((a, b) => last[b] - last[a]).slice(0, left);
-    fill.forEach(i => status[i] = 'elected');
-    stages.push({ votes: last, status: [...status], note: `${list(fill)} elected without reaching quota.` });
-  }
-  if (stages.length > 1) stages.at(-1).note += ` Elected: ${ids('elected').map(i => names[i]).join(', ')}.`;
-  ids('hopeful').forEach(i => status[i] = 'out');   // the rest lose, their last votes never transferred
-  stages.push({ votes: last, status: [...status], note: 'Election completed.' });
-  return { quota, stages };
-}
-
-// Replay the count on the ballots, in the vote table's order of transfers, so every vote keeps its
-// first preference. Piles of identical ballots move between candidates; a surplus moves the same
-// fraction of every ballot its winner holds, as Scotland's rules do, and the winner keeps the rest.
-// Returns, per stage, each candidate's votes by first preference (a Map from candidate to votes), or
-// null if the ballots don't reproduce the table. Every count in the repo matches within 0.05 votes.
-function origins(names, ballots, stages) {
-  const piles = ballots.map(b => ({ n: b.n, prefs: b.prefs, i: 0, w: 1, kept: false }));
-  const at = p => p.prefs[p.i];   // who holds the pile now; undefined once it's exhausted
-  const snap = () => names.map((_, c) => {
+  const sum = by => [...by.values()].reduce((a, b) => a + b, 0);
+  const cmp = (x, y) => Math.abs(x - y) < EPS ? 0 : x - y;
+  const firsts = c => {   // a candidate's votes by the voters' first choice
+    if (kept[c]) return kept[c];
     const by = new Map();
     for (const p of piles) if (at(p) === c) by.set(p.prefs[0], (by.get(p.prefs[0]) ?? 0) + p.n * p.w);
     return by;
-  });
-  const out = [snap()];
-  for (let r = 1; r < stages.length; r++) {
-    const s = stages[r].from, before = stages[r - 1];
-    if (s != null) {
-      const continuing = c => before.status[c] == 'hopeful' && c != s;
-      const surplus = before.status[s] == 'elected';
-      const held = piles.filter(p => at(p) === s && !p.kept);
-      const f = surplus ? (before.votes[s] - stages[r].votes[s]) / held.reduce((t, p) => t + p.n * p.w, 0) : 1;
-      for (const p of held) {
-        const moving = surplus ? { ...p, w: p.w * f } : p;
-        if (surplus) { p.w *= 1 - f; p.kept = true; piles.push(moving); }
-        do moving.i++; while (moving.i < moving.prefs.length && !continuing(moving.prefs[moving.i]));
-      }
+  };
+  const stages = [];
+  const record = (note, step = {}) => {   // tally, elect anyone at the quota, and keep the stage
+    const by = names.map((_, c) => firsts(c)), votes = by.map(sum);
+    // lost so far, by first choice: each candidate's first preferences minus what still counts
+    const trash = new Map(stages.length ? names.flatMap((_, o) => {
+      const x = stages[0].votes[o] - by.reduce((t, m) => t + (m.get(o) ?? 0), 0);
+      return x > EPS ? [[o, x]] : [];
+    }) : []);
+    const now = ids('hopeful').filter(c => votes[c] >= quota - EPS);
+    now.forEach(c => { status[c] = 'elected'; reached[c] = stages.length; });
+    if (now.length) note += ` ${list(now)} elected.`;
+    stages.push({ votes, firsts: by, trash, status: [...status], note, ...step });
+  };
+  record(`First preferences: ${fmt(total)} votes for ${seats} seats, quota ${quota}.`);
+  const vacancies = () => seats - ids('elected').length;
+  while (vacancies() > 0 && ids('hopeful').length > vacancies()) {
+    const v = stages.at(-1).votes;
+    const earliest = (a, b) => { for (const st of stages) if (cmp(st.votes[a], st.votes[b])) return cmp(st.votes[a], st.votes[b]); return 0; };
+    const surplus = ids('elected').filter(c => !kept[c] && v[c] > quota + EPS)
+      .sort((a, b) => reached[a] - reached[b] || cmp(v[b], v[a]) || earliest(b, a));
+    const from = surplus[0] ?? ids('hopeful').sort((a, b) => cmp(v[a], v[b]) || earliest(a, b) || a - b)[0];
+    const moved = surplus.length ? v[from] - quota : v[from];
+    if (surplus.length) kept[from] = new Map([...firsts(from)].map(([o, x]) => [o, x * quota / v[from]]));
+    else status[from] = 'out';
+    for (const p of piles.filter(p => at(p) === from)) {
+      if (surplus.length) p.w = Math.floor(moved * p.w / v[from] * 1e5 + EPS) / 1e5;
+      do p.i++; while (p.i < p.prefs.length && status[p.prefs[p.i]] != 'hopeful');   // skip winners and the eliminated
     }
-    out.push(snap());
+    const after = names.map((_, c) => sum(firsts(c))), transfers = {};
+    after.forEach((x, c) => { if (x - v[c] > EPS) transfers[c] = x - v[c]; });
+    const lost = moved - Object.values(transfers).reduce((a, b) => a + b, 0);   // exhausted ballots, and fractions lost to rounding
+    record((surplus.length ? `${names[from]}'s surplus of ${fmt(moved)} transferred.` : `${names[from]} eliminated, ${fmt(moved)} votes transferred.`)
+      + (lost > 0.005 ? ` ${fmt(lost)} non-transferable.` : ''), { from, transfers, lost });
   }
-  const sum = by => [...by.values()].reduce((a, b) => a + b, 0);
-  return out.some((comp, r) => comp.some((by, c) => Math.abs(sum(by) - stages[r].votes[c]) > 0.5)) ? null : out;
+  const last = stages.at(-1), left = vacancies();
+  if (left > 0) {   // as many candidates left as seats: they fill them without reaching the quota
+    const fill = ids('hopeful').sort((a, b) => last.votes[b] - last.votes[a]).slice(0, left);
+    fill.forEach(c => status[c] = 'elected');
+    stages.push({ votes: last.votes, firsts: last.firsts, trash: last.trash, status: [...status], note: `${list(fill)} elected without reaching quota.` });
+  }
+  if (stages.length > 1) stages.at(-1).note += ` Elected: ${ids('elected').map(i => names[i]).join(', ')}.`;
+  ids('hopeful').forEach(c => status[c] = 'out');   // the rest lose, their last votes never transferred
+  stages.push({ votes: last.votes, firsts: last.firsts, trash: last.trash, status: [...status], note: 'Election completed.' });
+  return { quota, stages };
 }
 
-// self-checks: A's surplus of 1 goes to B, C is eliminated and B takes the second seat
+// Read an election file from data/scot-elex: a first row of candidates and seats, then ballot rows
+// (how many ballots, then candidate numbers from 1 in preference order), then one row per candidate
+// with name and party, then the ward name.
+function parseElection(text) {
+  const rows = lines(text);
+  const candidates = rows.filter(l => l.startsWith('"Candidate ')).map(cells);
+  return {
+    seats: +rows[0].split(',')[1],
+    names: candidates.map(r => r[1]),   // some are cut short at hyphens and accents; the index has full names
+    parties: candidates.map(r => r[2].match(/\(([^()]*)\)\s*$/)?.[1] ?? ''),
+    ballots: rows.slice(1).filter(l => /^\d/.test(l)).map(l => {
+      const f = l.split(',').filter(Boolean).map(Number);
+      return { n: f[0], prefs: f.slice(1).map(c => c - 1) };
+    }),
+  };
+}
+
+// self-checks
 {
-  const { quota, stages } = count(['A', 'B', 'C'], [[5, 2, 2], [4, 3, 2], [4, 5, 0]], 2);
-  console.assert(quota == 4 && stages[1].from == 0 && stages[1].transfers[1] == 1 && stages[2].transfers[1] == 2
+  // A wins outright; A's surplus of 1 goes to B; C is eliminated and C's ballots skip A (already
+  // elected) to reach B, who takes the second seat
+  const { quota, stages } = count(['A', 'B', 'C'], 2, [{ n: 5, prefs: [0, 1] }, { n: 2, prefs: [1] }, { n: 2, prefs: [2, 0, 1] }]);
+  console.assert(quota == 4 && stages[1].from == 0 && stages[1].transfers[1] == 1 && stages[2].transfers[1] == 2 && !stages[2].transfers[0]
     && stages.at(-1).status.join() == 'elected,elected,out' && stages.at(-1).note == 'Election completed.', 'count self-check failed', stages);
   // B ends with 2 first preferences of their own, 1 that started with A and 2 that started with C
-  const o = origins(['A', 'B', 'C'], [{ n: 5, prefs: [0, 1] }, { n: 2, prefs: [1] }, { n: 2, prefs: [2, 1] }], stages);
-  console.assert(o && Math.abs(o[2][1].get(0) - 1) < 1e-9 && o[2][1].get(1) == 2 && o[2][1].get(2) == 2, 'origins self-check failed', o);
+  const b = stages[2].firsts[1];
+  console.assert(Math.abs(b.get(0) - 1) < 1e-9 && b.get(1) == 2 && b.get(2) == 2, 'first-choice self-check failed', b);
+  // A reaches the quota exactly; C's lone ballot runs out when C is eliminated; B fills the last seat
+  const fill = count(['A', 'B', 'C'], 2, [{ n: 3, prefs: [0] }, { n: 2, prefs: [1] }, { n: 1, prefs: [2] }]).stages;
+  console.assert(fill[1].lost == 1 && fill[1].trash.get(2) == 1 && fill.at(-2).note.startsWith('B elected without reaching quota')
+    && fill.at(-1).status.join() == 'elected,elected,out', 'fill self-check failed', fill);
   console.assert(cells('a,"b, ""c""",').join('|') == 'a|b, "c"|', 'csv self-check failed');
 }
+// Everything above runs without a browser; viz/check.mjs loads it to test the count.
 
 const elections = new Map();
 let run = 0, current, paused = false, waiting = null, reorder = () => {}, shown = 0;   // shown: the step on screen
@@ -283,10 +314,10 @@ const hold = ms => new Promise(resolve => {
 const setPaused = p => { paused = p; $('pause').textContent = p ? 'Play' : 'Pause'; };
 
 // Play a count from the start, or jump straight to step `start` and play on from there.
-async function show({ e, names, parties, votes, ballots }, start = 0) {
+async function show({ e, names, parties, ballots }, start = 0) {
   const me = ++run;
-  const { quota, stages } = count(names, votes, e.seats);
-  const comps = origins(names, ballots, stages);
+  const { quota, stages } = count(names, e.seats, ballots);
+  const votes = stages.map(s => s.votes);
   const T = names.length;   // index of the non-transferable row, after the candidates
   let stage = 0;   // the step on screen, for the first-preference breakdowns
   const lost = stages.reduce((t, s) => t + (s.lost > EPS ? s.lost : 0), 0);
@@ -300,9 +331,10 @@ async function show({ e, names, parties, votes, ballots }, start = 0) {
     return shade(PARTY_COLORS[p], same.indexOf(i) / same.length * 0.7);
   });
   const color = i => colors[i];
-  // each bar is a stack of chunks coloured by who last passed them on; the last row collects lost votes
-  const segs = [...names.map((_, i) => [{ from: i, amt: votes[0][i] }]), []];
-  const total = i => segs[i].reduce((t, g) => t + g.amt, 0);
+  // every bar is its votes by the voters' first choice; the last row collects the lost votes
+  const comp = i => i == T ? stages[stage].trash : stages[stage].firsts[i];
+  const total = m => [...m.values()].reduce((a, b) => a + b, 0);
+  const order = [...names.map((_, i) => [i]), []];   // each bar's first choices, in the order they arrived
   const rows = names.map((name, i) => {
     const row = tpl('row');
     row.querySelector('.name span').textContent = name;
@@ -333,32 +365,34 @@ async function show({ e, names, parties, votes, ballots }, start = 0) {
   $('steps').replaceChildren(...steps);
   $('view').hidden = false;
 
-  // the popup for a row: its votes by who last passed them on, largest first
+  // the popup for a row: its votes by the voters' first choice, largest first
   tipInfo = i => {
-    const x = total(i), head = i == T ? 'Non-transferable' : names[i], party = i == T ? '' : parties[i];
+    const by = comp(i), x = total(by), head = i == T ? 'Non-transferable' : names[i], party = i == T ? '' : parties[i];
     if (x <= EPS) return { head, party, sub: i == T ? 'No votes lost yet' : 'Eliminated', rows: [] };
-    const by = [...Map.groupBy(segs[i], g => g.from)].map(([f, gs]) => [f, gs.reduce((t, g) => t + g.amt, 0)]).sort((a, b) => b[1] - a[1]);
-    return { head, party, votes: `${fmt(x)} votes`, sub: i == T ? "Lost when these candidates' votes moved on" : 'Last passed on by',
-      rows: by.map(([f, v]) => ({ color: color(f), who: f == i ? 'Own first preferences' : names[f], party: f == i ? '' : parties[f], votes: fmt(v), share: v / x < 0.0005 ? '<0.1%' : `${(v / x * 100).toFixed(1)}%` })) };
+    const list = [...by].filter(([, v]) => v > EPS).sort((a, b) => b[1] - a[1]);
+    return { head, party, votes: `${fmt(x)} votes`, sub: i == T ? "Lost, by the voters' first choice" : "By the voters' first choice",
+      rows: list.map(([o, v]) => ({ color: color(o), who: o == i ? 'Own first preferences' : names[o], party: o == i ? '' : parties[o], votes: fmt(v), share: v / x < 0.0005 ? '<0.1%' : `${(v / x * 100).toFixed(1)}%` })) };
   };
   const paint = (i, st) => {
+    const by = comp(i);
+    for (const o of by.keys()) if (!order[i].includes(o)) order[i].push(o);   // new first choices join the end
+    // a winner's bar is one colour, so draw it as one box: no seams between chunks
+    const parts = st == 'elected' ? [[i, total(by)]] : order[i].map(o => [o, by.get(o) ?? 0]).filter(([, v]) => v > EPS);
     let x = 0;
     rows[i].className = 'row ' + st;
-    // a winner's bar is one colour, so draw it as one box: no seams between chunks
-    rows[i].querySelector('.track').replaceChildren(...(st == 'elected' ? [{ from: i, amt: total(i) }] : segs[i]).map(g => {
+    rows[i].querySelector('.track').replaceChildren(...parts.map(([o, v]) => {
       const d = document.createElement('div');
       d.className = 'seg';
-      d.style.cssText = `left:${pct(x)};width:${pct(g.amt)};--c:${color(g.from)}`;
-      x += g.amt;
+      d.style.cssText = `left:${pct(x)};width:${pct(v)};--c:${color(o)}`;
+      x += v;
       return d;
     }));
     const label = rows[i].querySelector('.total');
     label.style.left = pct(x);
     label.textContent = x > EPS ? fmt(x) : '';   // no 0 next to eliminated candidates
-    const by = comps && i < T ? [...comps[stage][i]].filter(([, v]) => v > EPS).sort((a, b) => b[1] - a[1]) : [];
-    const support = rows[i].querySelector('.support');
+    const support = rows[i].querySelector('.support');   // a winner's first choices, largest first
     support.style.width = pct(x);
-    support.replaceChildren(...(st == 'elected' ? by : []).map(([o, v]) => {
+    support.replaceChildren(...(st == 'elected' ? [...by].filter(([, v]) => v > EPS).sort((a, b) => b[1] - a[1]) : []).map(([o, v]) => {
       const d = document.createElement('div');
       d.style.cssText = `flex:${v};--c:${color(o)}`;
       return d;
@@ -370,31 +404,41 @@ async function show({ e, names, parties, votes, ballots }, start = 0) {
     paint(T, 'trash');
   };
   // Move one step's votes: cut them off the source bar, then add each recipient's share to the end of
-  // their bar and the lost votes to the non-transferable row, flying chips across when animating.
+  // their bar and the lost votes to the non-transferable row, flying chips across when animating. Each
+  // chip is a little stack of the voters' first choices it carries.
   const transfer = async (s, animate) => {
-    const src = s.from, keep = s.votes[src];   // quota after a surplus, 0 after an elimination
+    const src = s.from, keep = s.votes[src], before = stages[stage - 1];   // keep: quota after a surplus, 0 after an elimination
     const moves = [...Object.entries(s.transfers).map(([to, amt]) => [+to, amt]), ...(s.lost > EPS ? [[T, s.lost]] : [])];
-    const ends = moves.map(([to]) => total(to));   // where each receiving bar ends now
-    let x = keep;
-    const chips = animate ? moves.map(([to, amt]) => {
-      const chip = document.createElement('div');
-      chip.className = to == T ? 'chip lost' : 'chip';
-      chip.style.cssText = `left:${pct(x)};width:${pct(amt)};top:${rows[src].offsetTop}px;--c:${color(src)};--fly:${1 / speed()}s`;
-      x += amt;
-      $('chart').append(chip);
-      return chip;
-    }) : [];
-    // the source keeps the same share of every chunk, since a surplus moves part of every ballot
-    const held = total(src);
-    segs[src] = keep > EPS ? segs[src].map(g => ({ ...g, amt: g.amt * keep / held })) : [];
     paint(src, s.status[src]);
     if (animate) {
+      const gained = to => {   // what a row gains, by first choice, in the source bar's order
+        const now = comp(to), was = to == T ? before.trash : before.firsts[to];
+        return [...new Set([...order[src], ...now.keys()])].map(o => [o, (now.get(o) ?? 0) - (was.get(o) ?? 0)]).filter(([, v]) => v > EPS);
+      };
+      let x = keep;
+      const chips = moves.map(([to, amt]) => {
+        const chip = document.createElement('div');
+        chip.className = to == T ? 'chip lost' : 'chip';
+        chip.style.cssText = `left:${pct(x)};width:${pct(amt)};top:${rows[src].offsetTop}px;--fly:${1 / speed()}s`;
+        chip.append(...gained(to).map(([o, v]) => {
+          const d = document.createElement('div');
+          d.style.cssText = `flex:${v};--c:${color(o)}`;
+          return d;
+        }));
+        x += amt;
+        $('chart').append(chip);
+        return chip;
+      });
       $('chart').offsetWidth;   // force layout so the moves below animate
-      chips.forEach((chip, k) => { chip.style.left = pct(ends[k]); chip.style.top = rows[moves[k][0]].offsetTop + 'px'; });
+      chips.forEach((chip, k) => {
+        const to = moves[k][0];
+        chip.style.left = pct(to == T ? total(before.trash) : before.votes[to]);   // to the end of the receiving bar
+        chip.style.top = rows[to].offsetTop + 'px';
+      });
       await sleep(1000);
       chips.forEach(chip => chip.remove());
     }
-    for (const [to, amt] of moves) { segs[to].push({ from: src, amt }); paint(to, to == T ? 'trash' : s.status[to]); }
+    for (const [to] of moves) paint(to, to == T ? 'trash' : s.status[to]);
   };
   const mark = i => { stage = shown = i; steps.forEach((li, j) => li.className = j < i ? 'done' : j == i ? 'now' : ''); };
 
@@ -417,19 +461,10 @@ async function show({ e, names, parties, votes, ballots }, start = 0) {
 }
 
 async function open(e) {
-  const [table, election] = await Promise.all([get(ROOT + e.table), get(ROOT + e.election)]);
+  const text = await get(ROOT + e.election);
   if (location.hash.slice(1) != e.id) return;   // another election was picked meanwhile
-  const rows = lines(table).slice(1).map(cells);   // header is Candidate, Round 1, Round 2, ...
-  // names from the vote table (the election files truncate some); parties from the election file, same order
-  const el = lines(election);
-  const parties = el.filter(l => l.startsWith('"Candidate ')).map(l => cells(l)[2].match(/\(([^()]*)\)\s*$/)?.[1] ?? '');
-  // ballot rows: how many ballots, then candidate numbers (from 1) in preference order
-  const ballots = el.slice(1).filter(l => /^\d/.test(l)).map(l => {
-    const f = l.split(',').filter(Boolean).map(Number);
-    return { n: f[0], prefs: f.slice(1).map(c => c - 1) };
-  });
-  const votes = rows[0].slice(1).map((_, r) => rows.map(row => +row[r + 1]));
-  current = { e, names: rows.map(r => r[0]), parties, votes, ballots };
+  const { parties, ballots } = parseElection(text);
+  current = { e, names: e.names.split('|'), parties, ballots };   // full names from the index
   const playing = show(current);
   if (matchMedia('(max-width: 760px)').matches) $('view').scrollIntoView({ behavior: 'smooth' });   // phones: down from the list to the chart
   await playing;

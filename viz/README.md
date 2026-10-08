@@ -1,7 +1,8 @@
 # STV count viz
 
-Animates every Scottish council STV count in `data/scottish_vote_tables/`. It is plain HTML and
-JavaScript with no build step or dependencies.
+Animates the single transferable vote (STV) count of every Scottish council election in
+`data/scot-elex/`, counting each one from its ballots. It is plain HTML and JavaScript with no build
+step or dependencies.
 
 ## Run it
 
@@ -29,16 +30,24 @@ party's colour: Labour, Conservative, Liberal Democrat, Green and SNP have their
 other label, independents included, shares the independents' teal. Later candidates sharing a colour
 get lighter shades, in ballot order (alphabetical by surname).
 
-Each chunk of a bar shows the candidate who last passed those votes on, not who the voters first
-chose. A winner's bar turns grey, with a strip along its bottom showing where its votes started:
-each colour is the candidate those voters ranked first. Votes that can't transfer collect in a "Non-
-transferable" row at the bottom, hatched in the colour of the candidate whose transfer lost them.
-Hover over or tap a row for a table of who last passed its votes on.
+The page follows every ballot through the count, so each chunk of a bar shows which candidate those
+voters ranked first, even after their votes have passed through other candidates. When votes move,
+they fly from the candidate passing them on, coloured by the same first choices. A winner's bar
+turns grey, with a strip along its bottom showing their voters' first choices. Votes that can't
+transfer collect in a "Non-transferable" row at the bottom, hatched in the colour of the voters'
+first choice. Hover over or tap a row for a table of its votes by first choice.
 
-Vote tables only hold each round's totals, so the page replays the ballots from `data/scot-elex/`
-in the order the table records. A surplus moves the same fraction of every ballot the winner holds,
-as Scotland's rules do. The replay reproduces every vote table in the repo to within 0.05 votes. If
-a future table doesn't match, the strip is left out.
+The page counts each election itself from the ballots in `data/scot-elex/`, following Scotland's
+rules. The quota is the votes divided by one more than the seats, rounded down, plus one. Surpluses
+move one at a time, earliest winner first, then the largest; every ballot the winner holds moves on
+at a transfer value rounded down to five decimal places. With no surplus waiting, the candidate in
+last place is eliminated and all their ballots move on. Ties go by the earliest round where the
+candidates differed. Because every ballot keeps its first preference as it moves, the page knows
+where each vote started.
+
+The published vote tables in `data/scottish_vote_tables/` serve as a check: the page's counts match
+all 1,070 of them exactly, round by round. `node viz/check.mjs` re-runs that comparison using the
+page's own code, along with its built-in self-checks, and fails if anything differs.
 
 ## Controls
 
@@ -53,9 +62,11 @@ a future table doesn't match, the strip is left out.
 
 ## Update the election list
 
-`elections.csv` lists every vote table with its election file, seats, and ward name. Rebuild it
-after changing the data:
+`elections.csv` lists every election with its election file, seats, ward name, and full candidate
+names. The names come from the vote tables, because the election files cut some short at hyphens and
+accents. After changing the data, rebuild the list and re-check the counts:
 
 ```sh
 python3 viz/make_index.py
+node viz/check.mjs
 ```
