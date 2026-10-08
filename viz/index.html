@@ -6,25 +6,36 @@
   html, body { height: 100%; margin: 0; }
   body { font: 14px sans-serif; background: #fff; color: #000; box-sizing: border-box; padding: 20px 20px 0; display: grid; grid-template: auto 1fr / 300px 1fr; gap: 0 24px; overflow: hidden; }
   h1 { grid-column: 1 / -1; margin: 0 0 12px; }
-  nav, main { overflow: auto; min-height: 0; padding-bottom: 20px; }   /* each pane scrolls; the page doesn't */
+  nav, main { overflow: auto; scrollbar-gutter: stable; min-height: 0; padding-bottom: 20px; }   /* each pane scrolls; the page doesn't */
+  /* while recording: no clicks, hovers or scrolling (the gutter stops the layout shifting when scrollbars hide) */
+  .recording { pointer-events: none; }
+  .recording nav, .recording main { overflow: hidden; }
   nav { border-right: 1px solid #ddd; padding-right: 16px; }
   nav details details { margin-left: 16px; }
+  /* a thin chevron instead of the default triangle: points right when closed, down when open */
+  summary { list-style: none; cursor: pointer; }
+  summary::-webkit-details-marker { display: none; }   /* Safari's own marker */
+  summary::before { content: ''; display: inline-block; width: 6px; height: 6px; margin: 0 8px 2px 2px; border: solid #666; border-width: 0 1.5px 1.5px 0; transform: rotate(-45deg); transition: transform .15s; }
+  details[open] > summary::before { transform: rotate(45deg); }
   nav ul { margin: 4px 0 8px; padding-left: 20px; }
   nav small, .name small, #sub { color: #666; }
   nav a[aria-current] { font-weight: bold; }
   nav li small { white-space: nowrap; }
-  #stage { display: flow-root; padding: 4px 24px 12px; }   /* flow-root keeps the chart's margins inside the video */
+  #stage { display: flow-root; padding: 4px 24px 12px; min-width: 720px; }   /* flow-root keeps the chart's margins inside the video; min-width keeps bars readable in narrow windows */
   #steps { list-style: none; padding: 0; }   /* numbers are in the text so the video copies them */
   #steps li { color: #aaa; margin: 3px 0; }
   #steps li.done { color: #000; }
   #steps li.now { color: #000; font-weight: bold; }
   #rec-msg { color: #b00; }
-  #chart { position: relative; margin: 40px 100px 20px 260px; font-size: 16px; }
+  #chart { position: relative; margin: 40px 100px 20px 280px; font-size: 16px; }
   .row { position: relative; height: 36px; margin: 12px 0; }
-  .name { position: absolute; right: 100%; margin-right: 8px; max-width: 250px; overflow: hidden; text-overflow: ellipsis; line-height: 36px; white-space: nowrap; }
+  .name { position: absolute; right: 100%; margin-right: 8px; max-width: 270px; overflow: hidden; text-overflow: ellipsis; line-height: 36px; white-space: nowrap; }
   .out .name { text-decoration: line-through; color: #888; }
-  .seg, .chip { position: absolute; top: 0; height: 36px; background: var(--c); }
-  .elected .seg { background: #2a2; }
+  :root { --elected: #2a2; }   /* winner colour */
+  .dot { display: inline-block; width: 10px; height: 10px; margin-left: 6px; border-radius: 50%; vertical-align: middle; background: var(--c); }
+  .seg, .chip { position: absolute; top: 0; height: 36px; box-sizing: border-box; background: var(--c); }
+  .seg + .seg { border-left: 1px solid #fff; }   /* a divider between chunks */
+  .elected .seg { background: var(--elected); }
   .out .seg { background: #ccc; }
   .chip { transition: left var(--fly), top var(--fly); }
   .total { position: absolute; margin-left: 6px; line-height: 36px; font-weight: bold; }
@@ -49,14 +60,28 @@
 <template id="group"><details><summary></summary></details></template>
 <template id="ward"><li><a></a> <small></small></li></template>
 <template id="row">
-  <div class="row"><span class="name"><span></span> <small></small></span><div class="track"></div><span class="total"></span></div>
+  <div class="row"><span class="name"><span></span> <small></small><span class="dot"></span></span><div class="track"></div><span class="total"></span></div>
 </template>
 
 <script>
 const ROOT = '../';   // paths in elections.csv are relative to the repo root
 const EPS = 1e-6;
-const COLORS = ['#e6194b', '#4363d8', '#f58231', '#911eb4', '#42d4f4', '#f032e6', '#9a6324',   // no greens:
-  '#800000', '#000075', '#ffe119', '#469990', '#fabed4', '#dcbeff', '#ffd8b1'];               // green = elected
+// Placeholder party colours, one per party label in the data, until the real palette arrives.
+// Major parties first, then the rest by how often they stand. Unknown labels fall back to grey.
+const PARTY_COLORS = {
+  'SNP': '#d4a900', 'Lab': '#c8102e', 'Ind': '#8a7f72', 'Con': '#0b3c8c', 'LD': '#e67e00',
+  'Gr': '#2e8b3a', 'API': '#1f6f8b', 'UKIP': '#70147a', 'LabCo': '#a50d26', 'SFP': '#8e44ad',
+  'Soc': '#16a085', 'TUSC': '#a0522d', 'Sol': '#c2185b', 'Libtn': '#5d6d7e', 'SC': '#b7950b',
+  'SU': '#1abc9c', 'Glasgow First': '#6d4c41', 'SLP': '#7d3c98', 'ISP': '#117a65', 'SSC': '#d35400',
+  'FA': '#566573', 'Borders': '#8e44ad', 'NF': '#16a085', 'IANL': '#a0522d', 'Lib': '#c2185b',
+  'WDuns': '#5d6d7e', 'Sov': '#b7950b', 'SDP': '#1abc9c', 'Van': '#6d4c41', 'NRMUPB': '#7d3c98',
+  'BP': '#117a65', 'BNP': '#d35400', 'Pir': '#566573', 'CICA': '#8e44ad', 'EKA': '#16a085',
+  'Rubbish': '#a0522d', 'WEP': '#c2185b', 'Comm': '#5d6d7e', 'OMG': '#b7950b', 'EDIA': '#1abc9c',
+  'CPA': '#6d4c41', 'WPB': '#7d3c98', 'Volt': '#117a65', 'TPP': '#d35400', 'BU': '#566573',
+  'SEFP': '#8e44ad', 'RISE': '#16a085', 'ScIN': '#a0522d', 'MVR': '#c2185b'
+};
+// mix a #rrggbb colour with white: t = 0 keeps it, t = 1 is white
+const shade = (hex, t) => `rgb(${[1, 3, 5].map(i => Math.round(parseInt(hex.slice(i, i + 2), 16) * (1 - t) + 255 * t))})`;
 const $ = id => document.getElementById(id);
 const tpl = id => $(id).content.firstElementChild.cloneNode(true);
 const speed = () => +$('speed').value;
@@ -100,6 +125,8 @@ function count(names, votes, seats) {
     stages.push({ votes: last, status: [...status], note: `${list(fill)} elected without reaching quota.` });
   }
   if (stages.length > 1) stages.at(-1).note += ` Elected: ${ids('elected').map(i => names[i]).join(', ')}.`;
+  ids('hopeful').forEach(i => status[i] = 'out');   // the rest lose, their last votes never transferred
+  stages.push({ votes: last, status: [...status], note: 'Election completed.' });
   return { quota, stages };
 }
 
@@ -107,7 +134,7 @@ function count(names, votes, seats) {
 {
   const { quota, stages } = count(['A', 'B', 'C'], [[5, 2, 2], [4, 3, 2], [4, 5, 0]], 2);
   console.assert(quota == 4 && stages[1].from == 0 && stages[1].transfers[1] == 1 && stages[2].transfers[1] == 2
-    && stages.at(-1).status.join() == 'elected,elected,out', 'count self-check failed', stages);
+    && stages.at(-1).status.join() == 'elected,elected,out' && stages.at(-1).note == 'Election completed.', 'count self-check failed', stages);
   console.assert(cells('a,"b, ""c""",').join('|') == 'a|b, "c"|', 'csv self-check failed');
 }
 
@@ -119,21 +146,31 @@ async function show({ e, names, parties, votes }) {
   const { quota, stages } = count(names, votes, e.seats);
   const max = Math.max(quota, ...votes.flat()) * 1.1;
   const pct = v => v / max * 100 + '%';
-  const color = i => COLORS[i % COLORS.length];
+  // party colour, lighter for each later candidate of the same party in ballot order (alphabetical
+  // by surname), so the first is darkest
+  const colors = parties.map((p, i) => {
+    const same = parties.flatMap((q, j) => q == p ? [j] : []);
+    return shade(PARTY_COLORS[p] ?? '#999999', same.indexOf(i) / same.length * 0.7);
+  });
+  const color = i => colors[i];
   // each bar is a stack of chunks coloured by who sent them, until the holder is elected or out
   const segs = names.map((_, i) => [{ from: i, amt: votes[0][i] }]);
   const rows = names.map((name, i) => {
     const row = tpl('row');
     row.querySelector('.name span').textContent = name;
     row.querySelector('.name small').textContent = parties[i];
-    row.querySelector('.name').title = `${name} (${parties[i]})`;
+    row.querySelector('.dot').style.setProperty('--c', color(i));
     return row;
   });
   $('heading').textContent = `${e.council} ${e.year}: ${e.ward}`;
   $('sub').textContent = `${e.seats} seats, ${names.length} candidates, quota ${quota}`;
   $('quota').style.left = pct(quota);
   $('quota').firstChild.textContent = `quota ${quota}`;
-  $('rows').replaceChildren(...rows);
+  // rows grouped by party, parties by their combined first preferences, then candidates by their own
+  const first = votes[0], bloc = p => names.reduce((t, _, j) => t + (parties[j] == p ? first[j] : 0), 0);
+  const order = names.map((_, i) => i).sort((a, b) =>
+    bloc(parties[b]) - bloc(parties[a]) || parties[a].localeCompare(parties[b]) || first[b] - first[a]);
+  $('rows').replaceChildren(...order.map(i => rows[i]));
   $('chart').querySelectorAll('.chip').forEach(c => c.remove());   // left over from an interrupted run
   const steps = stages.map((s, i) => Object.assign(document.createElement('li'), { textContent: `${i + 1}. ${s.note}` }));
   $('steps').replaceChildren(...steps);
@@ -151,7 +188,7 @@ async function show({ e, names, parties, votes }) {
     }));
     const total = rows[i].querySelector('.total');
     total.style.left = pct(x);
-    total.textContent = fmt(x);
+    total.textContent = x > EPS ? fmt(x) : '';   // no 0 next to eliminated candidates
   };
   const draw = s => {
     names.forEach((_, i) => paint(i, s.status[i]));
@@ -225,7 +262,7 @@ get('elections.csv').then(text => {
         e.link = li.querySelector('a');
         e.link.href = '#' + e.id;
         e.link.textContent = e.ward;
-        li.querySelector('small').textContent = `${e.seats} seats, ${e.candidates} cands`;
+        li.querySelector('small').textContent = `${e.seats} seats, ${e.candidates} candidates`;
         ul.append(li);
         elections.set(e.id, e);
       }
@@ -243,6 +280,8 @@ async function record() {
   const stage = $('stage');
   $('rec-msg').textContent = '';
   $('rec').disabled = $('replay').disabled = true;   // replaying would cut the recording short
+  $('rec').textContent = 'Recording…';
+  document.body.classList.add('recording');
   try {
     const playing = show(current);   // builds the stage right away, then animates
     const steps = [...$('steps').children], was = steps.map(li => li.className);
@@ -273,14 +312,17 @@ async function record() {
     $('rec-msg').textContent = `Recording failed: ${err.message}`;
   } finally {
     $('rec').disabled = $('replay').disabled = false;
+    $('rec').textContent = 'Record video';
+    document.body.classList.remove('recording');
   }
 }
 $('rec').onclick = record;
 $('replay').onclick = () => show(current);
 $('rec').hidden = !(window.MediaRecorder && HTMLCanvasElement.prototype.captureStream);
 
-// Paint the stage onto a canvas from the page's live layout: coloured boxes, the dashed quota line,
-// and text word by word where the browser placed it. Covers what this page draws, nothing more.
+// Paint the stage onto a canvas from the page's live layout: every box with a background or a left
+// border (bars, chunks, dividers, dots, the dashed quota line), then text word by word where
+// the browser placed it. Covers what this page draws, nothing more.
 function drawStage(g, k, stage) {
   const o = stage.getBoundingClientRect();
   // boxes snap to whole canvas pixels, so touching chunks show no light seams between them
@@ -288,18 +330,21 @@ function drawStage(g, k, stage) {
   g.setTransform(1, 0, 0, 1, 0, 0);
   g.fillStyle = '#fff';
   g.fillRect(0, 0, g.canvas.width, g.canvas.height);
-  for (const el of stage.querySelectorAll('.seg, .chip')) {   // chips report their mid-flight position
-    const r = el.getBoundingClientRect();
-    g.fillStyle = getComputedStyle(el).backgroundColor;
-    g.fillRect(X(r.left), Y(r.top), X(r.right) - X(r.left), Y(r.bottom) - Y(r.top));
+  for (const el of stage.querySelectorAll('*')) {   // document order: children paint over parents
+    const r = el.getBoundingClientRect(), cs = getComputedStyle(el);   // chips report their mid-flight position
+    if (!r.width || !r.height) continue;   // also skips display: none
+    const x = X(r.left), y = Y(r.top), w = X(r.right) - x, h = Y(r.bottom) - y;
+    if (cs.backgroundColor != 'rgba(0, 0, 0, 0)') {
+      g.fillStyle = cs.backgroundColor;
+      if (cs.borderRadius == '50%') { g.beginPath(); g.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, 2 * Math.PI); g.fill(); }
+      else g.fillRect(x, y, w, h);
+    }
+    const bw = Math.round(parseFloat(cs.borderLeftWidth) * k);   // 0 when there is none
+    g.fillStyle = cs.borderLeftColor;
+    if (bw && cs.borderLeftStyle == 'dashed') for (let d = y; d < y + h; d += 10 * k) g.fillRect(x, d, bw, Math.min(6 * k, y + h - d));
+    else if (bw) g.fillRect(x, y, bw, h);
   }
-  g.setTransform(k, 0, 0, k, -o.left * k, -o.top * k);   // lines and text in page coordinates
-  const q = $('quota').getBoundingClientRect();
-  g.strokeStyle = 'red';
-  g.lineWidth = 2;
-  g.setLineDash([6, 4]);
-  g.beginPath(); g.moveTo(q.left + 1, q.top); g.lineTo(q.left + 1, q.bottom); g.stroke();
-  g.setLineDash([]);
+  g.setTransform(k, 0, 0, k, -o.left * k, -o.top * k);   // text in page coordinates
   g.lineWidth = 1;
   const range = document.createRange(), walk = document.createTreeWalker(stage, NodeFilter.SHOW_TEXT);
   for (let t; (t = walk.nextNode());) {
