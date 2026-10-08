@@ -70,3 +70,14 @@ accents. After changing the data, rebuild the list and re-check the counts:
 python3 viz/make_index.py
 node viz/check.mjs
 ```
+
+## Files
+
+| File            | What it holds                                                                        |
+| --------------- | ------------------------------------------------------------------------------------ |
+| `index.html`    | The page's markup and templates.                                                     |
+| `style.css`     | The page's styles.                                                                   |
+| `app.mjs`       | Everything on screen: the election list, chart, controls, popup and video recording. |
+| `count.mjs`     | The STV count and file reading, with no page code, so `check.mjs` can import it.     |
+| `check.mjs`     | Hand-worked checks, plus every count against its vote table.                         |
+| `make_index.py` | Builds `elections.csv`, the list of elections.                                       |
