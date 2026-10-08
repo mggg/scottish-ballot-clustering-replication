@@ -26,15 +26,15 @@ Each count has its own link, such as <http://localhost:8000/viz/#glasgow_2017_wa
 ## Reading the chart
 
 The page opens on an "About the data" introduction; pick a ward to watch its count. Bars take their
-party's colour: Labour, Conservative, Liberal Democrat, Green and SNP have their own, and every
-other label, independents included, shares the independents' teal. Later candidates sharing a colour
+party's color: Labour, Conservative, Liberal Democrat, Green and SNP have their own, and every
+other label, independents included, shares the independents' teal. Later candidates sharing a color
 get lighter shades, in ballot order (alphabetical by surname).
 
 The page follows every ballot through the count, so each chunk of a bar shows which candidate those
 voters ranked first, even after their votes have passed through other candidates. When votes move,
-they fly from the candidate passing them on, coloured by the same first choices. A winner's bar
-turns grey, with a strip along its bottom showing their voters' first choices. Votes that can't
-transfer collect in a "Non-transferable" row at the bottom, hatched in the colour of the voters'
+they fly from the candidate passing them on, colored by the same first choices. A winner's bar
+turns gray, with a strip along its bottom showing their voters' first choices. Votes that can't
+transfer collect in a "Non-transferable" row at the bottom, hatched in the color of the voters'
 first choice. Hover over or tap a row for a table of its votes by first choice.
 
 The page counts each election itself from the ballots in `data/scot-elex/`, following Scotland's

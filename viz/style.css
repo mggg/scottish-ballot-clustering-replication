@@ -46,7 +46,7 @@ button.primary:hover:not(:disabled) { background: #586265; }
 .row.trash { margin-top: 36px; }   /* set apart from the candidates */
 .trash .name { font-style: italic; color: #555; }
 .trash .dot { display: none; }
-:root { --elected: #697478; }   /* winner colour */
+:root { --elected: #697478; }   /* winner color */
 .dot { display: inline-block; width: 10px; height: 10px; margin-left: 6px; border-radius: 50%; vertical-align: middle; background: var(--c); }
 .seg, .chip { position: absolute; top: 0; height: 36px; box-sizing: border-box; }
 .seg, .chip div { background: var(--c); }
@@ -59,10 +59,10 @@ button.primary:hover:not(:disabled) { background: #586265; }
 .support div { background: var(--c); }
 .out .seg { background: #ccc; }
 .chip { transition: left var(--fly), top var(--fly); }
-/* non-transferable votes: diagonal hatching in the colour of the voters' first choice */
+/* non-transferable votes: diagonal hatching in the color of the voters' first choice */
 .trash .seg, .chip.lost div { background: repeating-linear-gradient(45deg, var(--c) 0 3px, #fff 3px 7px); }
 .total { position: absolute; margin-left: 6px; line-height: 36px; font-weight: bold; }
-#quota { position: absolute; top: -20px; bottom: 0; border-left: 2px dashed var(--elected); }   /* the winners' grey: reaching it wins */
+#quota { position: absolute; top: -20px; bottom: 0; border-left: 2px dashed var(--elected); }   /* the winners' gray: reaching it wins */
 #quota i { position: absolute; left: 4px; color: var(--elected); white-space: nowrap; }
 /* hover (or tap) popup: a row's votes by the voters' first choice */
 #tip { position: fixed; z-index: 10; pointer-events: none; min-width: 240px; max-width: 360px; padding: 10px 12px; background: #fff; border: 1px solid #d5d9dc; border-radius: 8px; box-shadow: 0 6px 20px rgba(0, 0, 0, .12); font-size: 13px; }

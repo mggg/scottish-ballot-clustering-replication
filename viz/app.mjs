@@ -2,10 +2,10 @@
 import { EPS, fmt, lines, cells, count, parseElection } from './count.mjs';
 
 const ROOT = '../';   // paths in elections.csv are relative to the repo root
-// Party colours. Every other label, independents included, takes the independents' teal.
+// Party colors. Every other label, independents included, takes the independents' teal.
 const PARTY_COLORS = { Lab: '#e32636', Con: '#0f4d92', LD: '#ff9933', Gr: '#4cbb17', SNP: '#ffe135', Ind: '#008b8b' };
-const colourGroup = p => p in PARTY_COLORS ? p : 'Ind';
-// mix a #rrggbb colour with white: t = 0 keeps it, t = 1 is white
+const colorGroup = p => p in PARTY_COLORS ? p : 'Ind';
+// mix a #rrggbb color with white: t = 0 keeps it, t = 1 is white
 const shade = (hex, t) => `rgb(${[1, 3, 5].map(i => Math.round(parseInt(hex.slice(i, i + 2), 16) * (1 - t) + 255 * t))})`;
 const $ = id => document.getElementById(id);
 const tpl = id => $(id).content.firstElementChild.cloneNode(true);
@@ -35,9 +35,9 @@ async function show({ e, names, parties, ballots }, start = 0) {
   const lost = stages.reduce((t, s) => t + (s.lost > EPS ? s.lost : 0), 0);
   const max = Math.max(quota, lost, ...votes.flat()) * 1.1;
   const pct = v => v / max * 100 + '%';
-  // party colour, lighter for each later candidate sharing it, in ballot order (alphabetical by
+  // party color, lighter for each later candidate sharing it, in ballot order (alphabetical by
   // surname), so the first is darkest
-  const groups = parties.map(colourGroup);
+  const groups = parties.map(colorGroup);
   const colors = groups.map((p, i) => {
     const same = groups.flatMap((q, j) => q == p ? [j] : []);
     return shade(PARTY_COLORS[p], same.indexOf(i) / same.length * 0.7);
@@ -88,7 +88,7 @@ async function show({ e, names, parties, ballots }, start = 0) {
   const paint = (i, st) => {
     const by = comp(i);
     for (const o of by.keys()) if (!order[i].includes(o)) order[i].push(o);   // new first choices join the end
-    // a winner's bar is one colour, so draw it as one box: no seams between chunks
+    // a winner's bar is one color, so draw it as one box: no seams between chunks
     const parts = st == 'elected' ? [[i, total(by)]] : order[i].map(o => [o, by.get(o) ?? 0]).filter(([, v]) => v > EPS);
     let x = 0;
     rows[i].className = 'row ' + st;
@@ -331,7 +331,7 @@ function drawStage(g, k, stage) {
       if (cs.borderRadius == '50%') { g.beginPath(); g.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, 2 * Math.PI); g.fill(); }
       else g.fillRect(x, y, w, h);
     }
-    if (cs.backgroundImage != 'none') {   // the hatched non-transferable chunks: stripes in their --c colour
+    if (cs.backgroundImage != 'none') {   // the hatched non-transferable chunks: stripes in their --c color
       g.save();
       g.beginPath(); g.rect(x, y, w, h); g.clip();
       g.fillStyle = '#fff'; g.fillRect(x, y, w, h);

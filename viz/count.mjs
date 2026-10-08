@@ -4,7 +4,7 @@
 export const EPS = 1e-6;   // vote differences smaller than this are floating-point noise
 export const fmt = n => +n.toFixed(2);   // votes for display: at most two decimal places
 export const lines = text => text.trim().split(/\r?\n/);
-// one CSV line -> fields, honouring "quoted, fields" and "" escapes
+// one CSV line -> fields, honoring "quoted, fields" and "" escapes
 export const cells = line => [...line.matchAll(/(?:^|,)("(?:[^"]|"")*"|[^,]*)/g)].map(m => m[1].replace(/^"(.*)"$/s, '$1').replaceAll('""', '"'));
 
 // Count an election from its ballots under Scotland's STV rules, one stage at a time:
