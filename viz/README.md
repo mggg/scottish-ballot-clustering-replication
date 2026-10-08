@@ -1,8 +1,7 @@
 # STV count viz
 
 Animates the single transferable vote (STV) count of every Scottish council election in
-`data/scot-elex/`, counting each one from its ballots. It is plain HTML and JavaScript with no build
-step or dependencies.
+`data/scottish_vote_tables/`. It is plain HTML and JavaScript with no build step or dependencies.
 
 ## Run it
 
@@ -30,24 +29,25 @@ party's color: Labour, Conservative, Liberal Democrat, Green and SNP have their 
 other label, independents included, shares the independents' teal. Later candidates sharing a color
 get lighter shades, in ballot order (alphabetical by surname).
 
-The page follows every ballot through the count, so each chunk of a bar shows which candidate those
-voters ranked first, even after their votes have passed through other candidates. When votes move,
-they fly from the candidate passing them on, colored by the same first choices. A winner's bar
-turns gray, with a strip along its bottom showing their voters' first choices. Votes that can't
-transfer collect in a "Non-transferable" row at the bottom, hatched in the color of the voters'
-first choice. Hover over or tap a row for a table of its votes by first choice.
+Each chunk of a bar shows the candidate who last passed those votes on. The vote tables only record
+each round's totals, so they can't show who the voters first chose: a vote can pass through several
+candidates before it settles.
 
-The page counts each election itself from the ballots in `data/scot-elex/`, following Scotland's
-rules. The quota is the votes divided by one more than the seats, rounded down, plus one. Surpluses
-move one at a time, earliest winner first, then the largest; every ballot the winner holds moves on
-at a transfer value rounded down to five decimal places. With no surplus waiting, the candidate in
-last place is eliminated and all their ballots move on. Ties go by the earliest round where the
-candidates differed. Because every ballot keeps its first preference as it moves, the page knows
-where each vote started.
+When a candidate is elected, their bar squashes down into a strip along its bottom, and the rest
+turns gray. When their surplus moves on, the gray bar and its strip squash back to the quota,
+keeping the same mix of colors, and the surplus above the quota, now in the winner's own color,
+flies to the candidates it transfers to. Votes that can't transfer collect in a "Non-transferable"
+row at the bottom, hatched in the color of the candidate whose transfer lost them. Hover over or tap
+a row for a table of who last passed its votes on.
 
-The published vote tables in `data/scottish_vote_tables/` serve as a check: the page's counts match
-all 1,070 of them exactly, round by round. `node viz/check.mjs` re-runs that comparison using the
-page's own code, along with its built-in self-checks, and fails if anything differs.
+The page rebuilds each count from its vote table, which lists every candidate's total after each
+round. Each round moves one candidate's votes: a winner's surplus, which cuts them back to the
+quota, or all the votes of the candidate eliminated. The quota is the votes divided by one more than
+the seats, rounded down, plus one. The rises in other totals are the transfers, and whatever they
+don't cover is non-transferable. When a winner's surplus moves, the winner keeps the same share of
+every part of their bar. `node viz/check.mjs` checks that every count rebuilds and fills its seats,
+that each table's first round matches its ballots in `data/scot-elex/`, and that no vote goes
+missing.
 
 ## Controls
 
@@ -62,9 +62,8 @@ page's own code, along with its built-in self-checks, and fails if anything diff
 
 ## Update the election list
 
-`elections.csv` lists every election with its election file, seats, ward name, and full candidate
-names. The names come from the vote tables, because the election files cut some short at hyphens and
-accents. After changing the data, rebuild the list and re-check the counts:
+`elections.csv` lists every vote table with its election file, seats, and ward name. After changing
+the data, rebuild the list and re-run the checks:
 
 ```sh
 python3 viz/make_index.py
@@ -73,11 +72,11 @@ node viz/check.mjs
 
 ## Files
 
-| File            | What it holds                                                                        |
-| --------------- | ------------------------------------------------------------------------------------ |
-| `index.html`    | The page's markup and templates.                                                     |
-| `style.css`     | The page's styles.                                                                   |
-| `app.mjs`       | Everything on screen: the election list, chart, controls, popup and video recording. |
-| `count.mjs`     | The STV count and file reading, with no page code, so `check.mjs` can import it.     |
-| `check.mjs`     | Hand-worked checks, plus every count against its vote table.                         |
-| `make_index.py` | Builds `elections.csv`, the list of elections.                                       |
+| File            | What it holds                                                           |
+| --------------- | ----------------------------------------------------------------------- |
+| `index.html`    | The page's markup and templates.                                        |
+| `style.css`     | The page's styles.                                                      |
+| `app.mjs`       | Everything on screen: the list, chart, controls, popup and recording.   |
+| `count.mjs`     | Rebuilds each count from its vote table, and reads the data files.      |
+| `check.mjs`     | Hand-worked checks, plus every election: count, ballots, no lost votes. |
+| `make_index.py` | Builds `elections.csv`, the list of elections.                          |

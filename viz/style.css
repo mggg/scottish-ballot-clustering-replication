@@ -50,21 +50,24 @@ button.primary:hover:not(:disabled) { background: #586265; }
 .dot { display: inline-block; width: 10px; height: 10px; margin-left: 6px; border-radius: 50%; vertical-align: middle; background: var(--c); }
 .seg, .chip { position: absolute; top: 0; height: 36px; box-sizing: border-box; }
 .seg, .chip div { background: var(--c); }
-.chip { display: flex; }   /* a stack of the voters' first choices it carries */
+.chip { display: flex; }
 .seg + .seg { border-left: 1px solid #fff; }   /* a divider between chunks */
-.elected .seg { background: var(--elected); border-left: 0; }   /* a winner keeps a share of every ballot, not whole chunks */
-/* a winner's strip: their votes split by the candidate those voters ranked first */
+.elected .seg { background: var(--elected); }
+/* a winner's strip: the same mix of who passed them their votes, kept as their surplus moves on */
 .support { display: none; position: absolute; left: 0; bottom: 0; height: 12px; }
 .elected .support { display: flex; }
-.support div { background: var(--c); }
+.support div { box-sizing: border-box; background: var(--c); }
+.support div + div { border-left: 1px solid #fff; }   /* the same dividers as the bar's chunks */
+/* a surplus waiting to move on, solid in the winner's color */
+.surplus { position: absolute; top: 0; height: 36px; background: var(--c); }
 .out .seg { background: #ccc; }
 .chip { transition: left var(--fly), top var(--fly); }
-/* non-transferable votes: diagonal hatching in the color of the voters' first choice */
+/* non-transferable votes: diagonal hatching in the color of the candidate whose transfer lost them */
 .trash .seg, .chip.lost div { background: repeating-linear-gradient(45deg, var(--c) 0 3px, #fff 3px 7px); }
 .total { position: absolute; margin-left: 6px; line-height: 36px; font-weight: bold; }
 #quota { position: absolute; top: -20px; bottom: 0; border-left: 2px dashed var(--elected); }   /* the winners' gray: reaching it wins */
 #quota i { position: absolute; left: 4px; color: var(--elected); white-space: nowrap; }
-/* hover (or tap) popup: a row's votes by the voters' first choice */
+/* hover (or tap) popup: a row's votes by who last passed them on */
 #tip { position: fixed; z-index: 10; pointer-events: none; min-width: 240px; max-width: 360px; padding: 10px 12px; background: #fff; border: 1px solid #d5d9dc; border-radius: 8px; box-shadow: 0 6px 20px rgba(0, 0, 0, .12); font-size: 13px; }
 #tip .head { display: flex; align-items: baseline; gap: 6px; font-weight: bold; }
 #tip .head small { font-weight: normal; color: #666; }
@@ -89,7 +92,7 @@ button.primary:hover:not(:disabled) { background: #586265; }
   .row { height: 24px; margin: 24px 0 8px; }
   .row.trash { margin-top: 44px; }
   .name { right: auto; left: 0; bottom: 100%; margin: 0 0 2px; max-width: none; line-height: 18px; }
-  .seg, .chip { height: 24px; }
+  .seg, .chip, .surplus { height: 24px; }
   .total { line-height: 24px; }
   .support { height: 8px; }
 }

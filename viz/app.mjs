@@ -1,5 +1,5 @@
 // The page: the election list, the animated chart and its controls, the popup, and video recording.
-import { EPS, fmt, lines, cells, count, parseElection } from './count.mjs';
+import { EPS, fmt, lines, cells, count, parseTable, parseElection } from './count.mjs';
 
 const ROOT = '../';   // paths in elections.csv are relative to the repo root
 // Party colors. Every other label, independents included, takes the independents' teal.
@@ -26,12 +26,11 @@ const hold = ms => new Promise(resolve => {
 const setPaused = p => { paused = p; $('pause').textContent = p ? 'Play' : 'Pause'; };
 
 // Play a count from the start, or jump straight to step `start` and play on from there.
-async function show({ e, names, parties, ballots }, start = 0) {
+async function show({ e, names, parties, votes }, start = 0) {
   const me = ++run;
-  const { quota, stages } = count(names, e.seats, ballots);
-  const votes = stages.map(s => s.votes);
+  const { quota, stages } = count(names, votes, e.seats);
   const T = names.length;   // index of the non-transferable row, after the candidates
-  let stage = 0;   // the step on screen, for the first-preference breakdowns
+  let stage = 0;   // the step on screen, for the breakdowns
   const lost = stages.reduce((t, s) => t + (s.lost > EPS ? s.lost : 0), 0);
   const max = Math.max(quota, lost, ...votes.flat()) * 1.1;
   const pct = v => v / max * 100 + '%';
@@ -43,10 +42,12 @@ async function show({ e, names, parties, ballots }, start = 0) {
     return shade(PARTY_COLORS[p], same.indexOf(i) / same.length * 0.7);
   });
   const color = i => colors[i];
-  // every bar is its votes by the voters' first choice; the last row collects the lost votes
-  const comp = i => i == T ? stages[stage].lostSoFar : stages[stage].byFirst[i];
+  // every bar is its votes by who last passed them on; the last row collects the lost votes, by whose
+  // transfer lost them
+  const comp = i => i == T ? stages[stage].lostSoFar : stages[stage].bySender[i];
   const total = m => [...m.values()].reduce((a, b) => a + b, 0);
-  const order = [...names.map((_, i) => [i]), []];   // each bar's first choices, in the order they arrived
+  const order = [...names.map((_, i) => [i]), []];   // each bar's senders, in the order they arrived
+  const won = names.map(() => false);   // whose bar has already turned gray
   const rows = names.map((name, i) => {
     const row = tpl('row');
     row.querySelector('.name span').textContent = name;
@@ -77,54 +78,79 @@ async function show({ e, names, parties, ballots }, start = 0) {
   $('steps').replaceChildren(...steps);
   $('view').hidden = false;
 
-  // the popup for a row: its votes by the voters' first choice, largest first
+  // the popup for a row: its votes by who last passed them on, largest first
   tipInfo = i => {
     const by = comp(i), x = total(by), head = i == T ? 'Non-transferable' : names[i], party = i == T ? '' : parties[i];
     if (x <= EPS) return { head, party, sub: i == T ? 'No votes lost yet' : 'Eliminated', rows: [] };
     const list = [...by].filter(([, v]) => v > EPS).sort((a, b) => b[1] - a[1]);
-    return { head, party, votes: `${fmt(x)} votes`, sub: i == T ? "Lost, by the voters' first choice" : "By the voters' first choice",
+    return { head, party, votes: `${fmt(x)} votes`, sub: i == T ? "Lost when these candidates' votes moved on" : 'Last passed on by',
       rows: list.map(([o, v]) => ({ color: color(o), who: o == i ? 'Own first preferences' : names[o], party: o == i ? '' : parties[o], votes: fmt(v), share: v / x < 0.0005 ? '<0.1%' : `${(v / x * 100).toFixed(1)}%` })) };
   };
-  const paint = (i, st) => {
-    const by = comp(i);
-    for (const o of by.keys()) if (!order[i].includes(o)) order[i].push(o);   // new first choices join the end
-    // a winner's bar is one color, so draw it as one box: no seams between chunks
-    const parts = st == 'elected' ? [[i, total(by)]] : order[i].map(o => [o, by.get(o) ?? 0]).filter(([, v]) => v > EPS);
-    let x = 0;
+  const paint = (i, st, animate = false) => {
+    const by = comp(i), x = total(by);
+    for (const o of by.keys()) if (!order[i].includes(o)) order[i].push(o);   // new senders join the end
+    const parts = order[i].map(o => [o, by.get(o) ?? 0]).filter(([, v]) => v > EPS);
     rows[i].className = 'row ' + st;
-    rows[i].querySelector('.track').replaceChildren(...parts.map(([o, v]) => {
+    // a winner's bar is one gray box, with the mix of who passed them their votes in the strip below
+    let left = 0;
+    rows[i].querySelector('.track').replaceChildren(...(st == 'elected' ? [[i, x]] : parts).map(([o, v]) => {
       const d = document.createElement('div');
       d.className = 'seg';
-      d.style.cssText = `left:${pct(x)};width:${pct(v)};--c:${color(o)}`;
-      x += v;
+      d.style.cssText = `left:${pct(left)};width:${pct(v)};--c:${color(o)}`;
+      left += v;
       return d;
     }));
     const label = rows[i].querySelector('.total');
     label.style.left = pct(x);
     label.textContent = x > EPS ? fmt(x) : '';   // no 0 next to eliminated candidates
-    const support = rows[i].querySelector('.support');   // a winner's first choices, largest first
-    support.style.width = pct(x);
-    support.replaceChildren(...(st == 'elected' ? [...by].filter(([, v]) => v > EPS).sort((a, b) => b[1] - a[1]) : []).map(([o, v]) => {
+    const strip = rows[i].querySelector('.support');
+    strip.style.cssText = `width:${pct(x)}`;
+    strip.replaceChildren(...(st == 'elected' ? parts : []).map(([o, v]) => {
       const d = document.createElement('div');
       d.style.cssText = `flex:${v};--c:${color(o)}`;
       return d;
     }));
+    // A new winner's colored bar squashes down into the strip, leaving gray above it.
+    if (st == 'elected' && !won[i] && animate) {
+      strip.style.height = '100%';
+      strip.offsetWidth;   // force layout so the squash below animates
+      strip.style.transition = `height ${0.8 / speed()}s`;
+      strip.style.height = '';
+    }
+    won[i] = st == 'elected';
     if (i == tipAt) renderTip();   // keep an open popup current as votes move
   };
-  const draw = s => {
-    names.forEach((_, i) => paint(i, s.status[i]));
+  const draw = (s, animate = false) => {
+    names.forEach((_, i) => paint(i, s.status[i], animate));
     paint(T, 'trash');
   };
-  // Move one step's votes: cut them off the source bar, then add each recipient's share to the end of
-  // their bar and the lost votes to the non-transferable row, flying chips across when animating. Each
-  // chip is a little stack of the voters' first choices it carries.
+  // Move one step's votes: take them off the source bar, then add each recipient's share to the end of
+  // their bar and the lost votes to the non-transferable row, flying chips across when animating. The
+  // chips are in the color of the candidate passing the votes on.
   const transfer = async (s, animate) => {
-    const src = s.from, keep = s.votes[src], before = stages[stage - 1];   // keep: quota after a surplus, 0 after an elimination
+    const src = s.from, before = stages[stage - 1];
+    const keep = s.votes[src], had = before.votes[src];   // keep: the quota after a surplus, 0 after an elimination
     const moves = [...Object.entries(s.transfers).map(([to, amt]) => [+to, amt]), ...(s.lost > EPS ? [[T, s.lost]] : [])];
-    paint(src, s.status[src]);
+    if (animate && keep > EPS) {
+      // A surplus: the gray bar and its strip squash back to the quota, keeping the same mix, and the
+      // surplus above the quota is left solid in the winner's color, ready to move on.
+      const row = rows[src], track = row.querySelector('.track'), strip = row.querySelector('.support');
+      const solid = document.createElement('div');
+      solid.className = 'surplus';
+      solid.style.cssText = `left:${pct(keep)};width:${pct(had - keep)};--c:${color(src)}`;
+      track.prepend(solid);   // behind the gray bar, until it squashes back
+      row.offsetWidth;   // force layout so the squash below animates
+      for (const el of [track.querySelector('.seg'), strip]) {
+        el.style.transition = `width ${0.8 / speed()}s`;
+        el.style.width = pct(keep);
+      }
+      await sleep(800);
+      if (me != run) return;
+    }
+    paint(src, s.status[src]);   // the source as it is after the move
     if (animate) {
-      const gained = to => {   // what a row gains, by first choice, in the source bar's order
-        const now = comp(to), was = to == T ? before.lostSoFar : before.byFirst[to];
+      const gained = to => {   // what a row gains, by sender, in the source bar's order
+        const now = comp(to), was = to == T ? before.lostSoFar : before.bySender[to];
         return [...new Set([...order[src], ...now.keys()])].map(o => [o, (now.get(o) ?? 0) - (was.get(o) ?? 0)]).filter(([, v]) => v > EPS);
       };
       let x = keep;
@@ -150,12 +176,12 @@ async function show({ e, names, parties, ballots }, start = 0) {
       await sleep(1000);
       chips.forEach(chip => chip.remove());
     }
-    for (const [to] of moves) paint(to, to == T ? 'trash' : s.status[to]);
+    for (const [to] of moves) paint(to, to == T ? 'trash' : s.status[to], animate);
   };
   const mark = i => { stage = shown = i; steps.forEach((li, j) => li.className = j < i ? 'done' : j == i ? 'now' : ''); };
 
   mark(0);
-  draw(stages[0]);
+  draw(stages[0], start == 0);
   for (let i = 1; i <= start; i++) {   // jump: replay the earlier steps instantly
     mark(i);
     if (stages[i].from != null) await transfer(stages[i], false);
@@ -167,16 +193,17 @@ async function show({ e, names, parties, ballots }, start = 0) {
     mark(i);
     if (stages[i].from != null) await transfer(stages[i], true);
     if (me != run) return;
-    draw(stages[i]);
+    draw(stages[i], true);
   }
   await sleep(1500);   // hold the final state, so a video ends on it
 }
 
 async function open(e) {
-  const text = await get(ROOT + e.election);
+  const [table, election] = await Promise.all([get(ROOT + e.table), get(ROOT + e.election)]);
   if (location.hash.slice(1) != e.id) return;   // another election was picked meanwhile
-  const { parties, ballots } = parseElection(text);
-  current = { e, names: e.names.split('|'), parties, ballots };   // full names from the index
+  const { names, votes } = parseTable(table);   // the election files cut some names short
+  const { parties } = parseElection(election);   // in the same order as the vote table
+  current = { e, names, parties, votes };
   const playing = show(current);
   if (matchMedia('(max-width: 760px)').matches) $('view').scrollIntoView({ behavior: 'smooth' });   // phones: down from the list to the chart
   await playing;
