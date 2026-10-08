@@ -9,3 +9,5 @@ build/
 dist/
 /dev-files
 IP_solutions
+.DS_Store
+/site/
