@@ -1,0 +1,26 @@
+# Publishes viz/ to GitHub Pages: main at the site root, each PR under pr-preview/pr-N/.
+# One-time setup: Settings > Pages > Source = "Deploy from a branch", branch gh-pages, folder /.
+name: pages
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, reopened, synchronize, closed]
+concurrency: pages-${{ github.ref }}
+permissions:
+  contents: write
+  pull-requests: write
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assemble site  # only what the page fetches, keeps previews small
+        run: |
+          mkdir -p _site/data
+          cp -r viz _site/viz
+          cp -r data/scot-elex data/scottish_vote_tables _site/data/
+          echo '<meta http-equiv="refresh" content="0; url=viz/">' > _site/index.html
+      - uses: rossjrw/pr-preview-action@v1
+        with:
+          source-dir: _site
