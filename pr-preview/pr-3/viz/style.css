@@ -1,0 +1,98 @@
+html, body { height: 100%; margin: 0; }
+body { font: 14px sans-serif; background: #fff; color: #000; box-sizing: border-box; padding: 20px 20px 0; display: grid; grid-template: auto 1fr / 300px 1fr; gap: 0 24px; overflow: hidden; }
+h1 { grid-column: 1 / -1; margin: 0 0 12px; }
+nav, main { overflow: auto; scrollbar-gutter: stable; min-height: 0; padding-bottom: 20px; }   /* each pane scrolls; the page doesn't */
+/* while recording: no clicks, hovers or scrolling (the gutter stops the layout shifting when scrollbars hide) */
+.recording { pointer-events: none; overflow: hidden; }
+.recording nav, .recording main { overflow: hidden; }
+nav { border-right: 1px solid #ddd; padding-right: 16px; }
+#about { display: block; margin-bottom: 10px; }
+nav details details { margin-left: 16px; }
+/* a thin chevron instead of the default triangle: points right when closed, down when open */
+summary { list-style: none; cursor: pointer; }
+summary::-webkit-details-marker { display: none; }   /* Safari's own marker */
+summary::before { content: ''; display: inline-block; width: 6px; height: 6px; margin: 0 8px 2px 2px; border: solid #666; border-width: 0 1.5px 1.5px 0; transform: rotate(-45deg); transition: transform .15s; }
+details[open] > summary::before { transform: rotate(45deg); }
+nav ul { margin: 4px 0 8px; padding-left: 20px; }
+nav small, .name small, #sub, #legend { color: #666; }
+nav a[aria-current] { font-weight: bold; }
+nav li small { white-space: nowrap; }
+#intro { max-width: 680px; line-height: 1.5; }
+#intro h2 { margin-top: 0; }
+#intro h3 { margin: 18px 0 4px; font-size: 15px; }
+#intro p { margin: 0 0 8px; }
+/* controls */
+#controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+#controls label { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: #555; }
+button, select { font: inherit; font-size: 13px; padding: 5px 12px; border: 1px solid #c9cdd1; border-radius: 6px; background: #fff; color: #222; cursor: pointer; }
+select { padding: 4px 8px; }
+button:hover:not(:disabled), select:hover { background: #f1f3f4; }
+button:disabled { opacity: .45; cursor: default; }
+button.primary { background: #697478; border-color: #697478; color: #fff; }
+button.primary:hover:not(:disabled) { background: #586265; }
+#rec-msg { color: #b00; }
+/* the recorded area */
+#stage { display: flow-root; padding: 4px 24px 12px; min-width: 720px; }   /* flow-root keeps the chart's margins inside the video; min-width keeps bars readable in narrow windows */
+#legend { font-size: 13px; margin: 0 0 8px; }
+#steps { list-style: none; padding: 0; }   /* numbers are in the text so the video copies them */
+#steps li { color: #aaa; margin: 3px 0; cursor: pointer; }
+#steps li:hover { text-decoration: underline; }
+#steps li.done { color: #000; }
+#steps li.now { color: #000; font-weight: bold; }
+#chart { position: relative; display: flow-root; margin: 40px 100px 20px 280px; font-size: 16px; }   /* flow-root: rows keep their top margin below the quota label */
+.row { position: relative; height: 36px; margin: 12px 0; }
+.name { position: absolute; right: 100%; margin-right: 8px; max-width: 270px; overflow: hidden; text-overflow: ellipsis; line-height: 36px; white-space: nowrap; }
+.out .name { text-decoration: line-through; color: #888; }
+.row.trash { margin-top: 36px; }   /* set apart from the candidates */
+.trash .name { font-style: italic; color: #555; }
+.trash .dot { display: none; }
+:root { --elected: #697478; }   /* winner color */
+.dot { display: inline-block; width: 10px; height: 10px; margin-left: 6px; border-radius: 50%; vertical-align: middle; background: var(--c); }
+.seg, .chip { position: absolute; top: 0; height: 36px; box-sizing: border-box; }
+.seg, .chip div { background: var(--c); }
+.chip { display: flex; }
+.seg + .seg { border-left: 1px solid #fff; }   /* a divider between chunks */
+.elected .seg { background: var(--elected); }
+/* a winner's strip: the same mix of who passed them their votes, kept as their surplus moves on */
+.support { display: none; position: absolute; left: 0; bottom: 0; height: 12px; }
+.elected .support { display: flex; }
+.support div { box-sizing: border-box; background: var(--c); }
+.support div + div { border-left: 1px solid #fff; }   /* the same dividers as the bar's chunks */
+/* a surplus waiting to move on, solid in the winner's color */
+.surplus { position: absolute; top: 0; height: 36px; background: var(--c); }
+.out .seg { background: #ccc; }
+.chip { transition: left var(--fly), top var(--fly); }
+/* non-transferable votes: diagonal hatching in the color of the candidate whose transfer lost them */
+.trash .seg, .chip.lost div { background: repeating-linear-gradient(45deg, var(--c) 0 3px, #fff 3px 7px); }
+.total { position: absolute; margin-left: 6px; line-height: 36px; font-weight: bold; }
+#quota { position: absolute; top: -20px; bottom: 0; border-left: 2px dashed var(--elected); }   /* the winners' gray: reaching it wins */
+#quota i { position: absolute; left: 4px; color: var(--elected); white-space: nowrap; }
+/* hover (or tap) popup: a row's votes by who last passed them on */
+#tip { position: fixed; z-index: 10; pointer-events: none; min-width: 240px; max-width: 360px; padding: 10px 12px; background: #fff; border: 1px solid #d5d9dc; border-radius: 8px; box-shadow: 0 6px 20px rgba(0, 0, 0, .12); font-size: 13px; }
+#tip .head { display: flex; align-items: baseline; gap: 6px; font-weight: bold; }
+#tip .head small { font-weight: normal; color: #666; }
+#tip .head .num { margin-left: auto; padding-left: 12px; }
+#tip .sub { color: #666; margin: 2px 0 6px; }
+#tip table { width: 100%; border-collapse: collapse; }
+#tip td { padding: 3px 4px; }
+#tip tr + tr td { border-top: 1px solid #eef0f1; }
+#tip td small { color: #666; }
+#tip .num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+#tip .dot { margin: 0; }
+/* phones: one column, the page scrolls as a whole, and names sit on their own line above each bar */
+@media (max-width: 760px) {
+  html, body { height: auto; }
+  body { display: block; overflow: auto; padding: 12px; }
+  h1 { font-size: 20px; }
+  nav { max-height: 40vh; border-right: 0; border-bottom: 1px solid #ddd; padding: 0 0 8px; margin-bottom: 12px; }
+  nav li { padding: 2px 0; }
+  main { overflow: visible; }
+  #stage { min-width: 0; padding: 4px 0 12px; }
+  #chart { margin: 36px 64px 20px 0; font-size: 14px; }
+  .row { height: 24px; margin: 24px 0 8px; }
+  .row.trash { margin-top: 44px; }
+  .name { right: auto; left: 0; bottom: 100%; margin: 0 0 2px; max-width: none; line-height: 18px; }
+  .seg, .chip, .surplus { height: 24px; }
+  .total { line-height: 24px; }
+  .support { height: 8px; }
+}

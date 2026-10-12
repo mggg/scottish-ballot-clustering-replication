@@ -1,0 +1,85 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scottish STV counts</title>
+<!-- Needs a local web server; see viz/README.md for the commands. -->
+<link rel="stylesheet" href="style.css">
+<script type="module" src="app.mjs"></script>
+
+<h1>Scottish STV counts</h1>
+<nav>
+  <a href="#" id="about">About the data</a>
+  <div id="index">Loading…</div>
+</nav>
+<main>
+  <section id="intro">
+    <h2>About the data</h2>
+    <p>This page replays the counts of 1,070 Scottish council elections from 2007, 2012, 2017 and 2022,
+      each decided by single transferable vote (STV). Pick a ward on the left to watch its count.</p>
+    <h3>Where it comes from</h3>
+    <p>The data and this page's code are in the
+      <a href="https://github.com/mggg/scottish-ballot-clustering-replication">mggg/scottish-ballot-clustering-replication</a>
+      repository on GitHub. David McCune assembled and cleaned the ballot records from Scottish sources.
+      They are in <a href="https://github.com/mggg/scottish-ballot-clustering-replication/tree/main/data/scot-elex"><code>data/scot-elex/</code></a>,
+      one file per election with every ballot's ranking and each candidate's party. The counts come from
+      the published round-by-round results in
+      <a href="https://github.com/mggg/scottish-ballot-clustering-replication/tree/main/data/scottish_vote_tables"><code>data/scottish_vote_tables/</code></a>,
+      which list every candidate's total after each round.</p>
+    <h3>How a count works</h3>
+    <p>A candidate wins on reaching the quota: the total votes divided by one more than the number of
+      seats, rounded down, plus one. Each round moves one candidate's votes on to the next choice on each
+      ballot: either a winner's surplus above the quota, or every vote of the candidate in last place.
+      Votes whose ballots rank no one still in the race are non-transferable. The vote tables only record
+      each round's totals, so the page reads each transfer from whose totals rise, and counts the
+      shortfall as non-transferable.</p>
+    <h3>What the colors mean</h3>
+    <p>Bars use party colors: Labour, Conservative, Liberal Democrat, Green and SNP have their own, and
+      every other party, independents included, shares the independents' teal. Candidates sharing a
+      color get lighter shades in ballot order, which is alphabetical by surname. Each chunk of a bar
+      shows the candidate who last passed those votes on. Because the vote tables only record totals,
+      they can't show who the voters first chose: a vote can pass through several candidates before it
+      settles.</p>
+    <p>When a candidate is elected, their bar squashes down into a strip along its bottom, and the rest
+      turns gray. When their surplus moves on, the gray bar and its strip squash back to the quota,
+      keeping the same mix of colors, and the surplus above the quota, now in the winner's own color,
+      flies to the candidates it transfers to. Non-transferable votes collect in the bottom row, hatched
+      in the color of the candidate whose transfer lost them. Hover over or tap a row for a table of who
+      last passed its votes on.</p>
+    <h3>Controls</h3>
+    <p>Replay restarts the count. Pause stops between steps, and Previous step and Next step move one
+      step at a time; click any step in the list to jump to it. Speed and Order change how fast the count
+      plays and how candidates are sorted. Download MP4 replays the count and saves it as a video.</p>
+  </section>
+  <div id="view" hidden>
+    <div id="controls">
+      <button id="replay">Replay</button>
+      <button id="prev">Previous step</button>
+      <button id="pause">Pause</button>
+      <button id="next">Next step</button>
+      <label>Speed <select id="speed"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option></select></label>
+      <label>Order <select id="sort"><option value="alpha" selected>Alphabetical</option><option value="first">First-place votes</option><option value="party">First-place votes by party</option></select></label>
+      <button id="rec" class="primary">Download MP4</button>
+      <span id="rec-msg"></span>
+    </div>
+    <div id="stage">
+      <h2 id="heading"></h2>
+      <div id="sub"></div>
+      <div id="chart"><div id="quota"><i></i></div><div id="rows"></div></div>
+      <p id="legend">Bar colors show who last passed the votes on. The vote tables only record totals, so they can't show who the voters first chose. A winner's strip keeps that mix as their surplus moves on. Non-transferable votes collect, hatched, in the bottom row.</p>
+      <ol id="steps"></ol>
+    </div>
+  </div>
+</main>
+
+<div id="tip" hidden>
+  <div class="head"><span></span> <small></small><span class="num"></span></div>
+  <div class="sub"></div>
+  <table><tbody></tbody></table>
+</div>
+
+<template id="group"><details><summary></summary></details></template>
+<template id="tip-row"><tr><td><span class="dot"></span></td><td><span></span> <small></small></td><td class="num"></td><td class="num"></td></tr></template>
+<template id="ward"><li><a></a> <small></small></li></template>
+<template id="row">
+  <div class="row"><span class="name"><span></span> <small></small><span class="dot"></span></span><div class="track"></div><div class="support"></div><span class="total"></span></div>
+</template>
