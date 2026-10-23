@@ -343,6 +343,11 @@ def _solve_integer_program(
     ) as model:
         model.Params.LogFile = str(paths.log)
 
+        # Gurobi stops when either gap tolerance is met. The objective is integral, so an
+        # absolute gap below 1 certifies an exact optimum; the relative gap must not end it first.
+        model.Params.MIPGap = 0
+        model.Params.MIPGapAbs = 0.1
+
         if time_limit is not None:
             model.Params.TimeLimit = time_limit
 

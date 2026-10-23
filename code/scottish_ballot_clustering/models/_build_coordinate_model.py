@@ -25,8 +25,7 @@ class CoordinateModelState(TypedDict):
             v, regardless of the center's coordinate value.
         assignments (gurobipy.tupledict): Binary assignment variables x[j, r].
         center_values (gurobipy.tupledict): Binary center-value indicators z[i, r, v].
-        costs (gurobipy.tupledict): Integer costs C[i, r] for each
-            coordinate and cluster.
+        costs (gurobipy.tupledict): Integer costs C[i, r] for each coordinate and cluster.
         cost_bound (int): Total ballot weight times coordinate range; bounds each coordinate cost.
     """
 
